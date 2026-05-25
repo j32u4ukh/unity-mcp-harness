@@ -1,0 +1,40 @@
+# Unity 建構目標與任務清單
+# 複製為 build_goals.yaml 後依專案修改（build_goals.yaml 已 gitignore）
+
+project: "示範專案 — 基礎場景"
+# LLM 別名（預設 gemini-flash；見 unity_common.DEFAULT_LLM_MODEL）
+# model: gemini-flash
+max_tool_rounds: 12
+
+mcp_servers:
+  - unity
+
+# 可選：所有任務共用的背景說明
+system_context: |
+  目標是建立可遊玩的最小垂直切片場景。
+  請勿刪除既有的重要物件，除非任務明確要求。
+
+tasks:
+  - id: inspect_scene
+    title: 檢視目前場景
+    prompt: |
+      列出目前 Hierarchy 的主要物件與場景名稱。
+      若場景為空，說明目前是空場景。
+
+  - id: add_ground
+    title: 建立地面
+    prompt: |
+      在場景中建立一個名為 Ground 的 Plane（或等同地面），
+      縮放適中作為遊玩平面。回報 Transform 設定。
+
+  - id: add_player_cube
+    title: 建立玩家占位
+    prompt: |
+      建立名為 Player 的 Cube，放在 Ground 上方約 1 單位處。
+      可選：加上鮮明顏色材質以便辨識。
+
+  - id: add_light
+    title: 加入方向光
+    prompt: |
+      加入 Directional Light，角度能清楚照亮 Ground 與 Player。
+      簡述光照設定。

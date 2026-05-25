@@ -1,0 +1,9 @@
+{
+  "unity": {
+    "transport": "stdio",
+    "command": "C:\\Users\\PC\\.unity\\relay\\relay_win.exe",
+    "args": ["--mcp"],
+    "auth_type": "none",
+    "description": "Unity MCP via relay（stdio）"
+  }
+}

@@ -1,0 +1,46 @@
+[project]
+name = "unity-mcp"
+version = "0.2.0"
+description = "Unity MCP + LangGraph 建構工作流（任務清單依序執行，LLM 經 aicentral）"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aicentral[mcp]",
+    "aicentral-agent",
+    "langgraph>=1.0.10",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+unity-mcp-chat = "chat:main"
+unity-mcp-ask = "ask:main"
+unity-mcp-list-tools = "list_tools:main"
+unity-mcp-build = "run_build:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = [
+    "unity_common",
+    "tasks",
+    "build_workflow",
+    "run_build",
+    "chat",
+    "ask",
+    "list_tools",
+]
+
+[tool.uv.sources]
+aicentral = { path = "../aicentral", editable = true }
+aicentral-agent = { path = "../aicentral-agent", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

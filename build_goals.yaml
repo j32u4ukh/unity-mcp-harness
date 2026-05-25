@@ -1,0 +1,194 @@
+project: "Unity 2D Example Scene — Red Sprite Demo"
+
+# LLM：直連 gemini-3.1-flash-lite（需 secret.yaml 的 gemini.api_key）
+# 若要走多模型池輪換，可改為 model: gemini-flash（aicentral gemini_pools.default）
+model: gemini-flash
+
+max_tool_rounds: 20
+
+mcp_servers:
+  - unity
+
+###############################################################################
+# GLOBAL GOAL
+###############################################################################
+
+goal: |
+  建立一個最小可運行、可視化、可驗證的 Unity 2D 範例場景。
+  本專案採用 URP 2D 渲染管線，所有物件與光源必須完全符合 2D 開發規範。
+
+  場景資產路徑（固定，勿改用 Assets/Scenes）：
+  - 資料夾：Assets/_Scenes/
+  - 場景檔：Assets/_Scenes/Example2DScene.unity
+
+  最終結果必須符合：
+  - Scene 可正常開啟
+  - Game View (2D) 可直接看到位於中央的紅色 2D 矩形 (Sprite)
+  - 所有 2D 必要元件已正確建立，無 3D 混用組件
+  - 專案可被其他 2D 遊戲開發者立即理解與繼續使用
+
+###############################################################################
+# DEFINITION OF DONE
+###############################################################################
+
+definition_of_done:
+  - Scene 已建立並儲存至 Assets/_Scenes/Example2DScene.unity
+  - Scene 已設為 Active Scene
+  - Scene 中存在 Main Camera，且其 Camera 元件的 Projection 已設為 Orthographic (2D)
+  - Scene 中存在 2D 光源（如 Global Light 2D），以確保 2D 物件可見
+  - Scene 中存在名為 "RedSquare2D" 的 GameObject
+  - RedSquare2D 必須擁有 SpriteRenderer 組件（禁止使用 MeshRenderer 或 MeshFilter）
+  - RedSquare2D 的 SpriteRenderer 顏色 (Color) 屬性成功被修改為純紅色 (RGB: 1, 0, 0, 1)
+  - RedSquare2D 位於 Camera 的正交可視範圍內
+  - 所有 GameObject 狀態為 Active
+  - Scene 無 Missing Reference
+  - 所有修改已保存
+
+###############################################################################
+# AGENT CONSTITUTION
+###############################################################################
+
+system_context: |
+  你是一位資深的 Unity 2D Gameplay Engineer 與 2D Technical Artist。
+  你對 URP 2D 渲染管線、SpriteRenderer、2D 光照系統以及正交相機 (Orthographic Camera) 瞭如指掌。
+
+  你擁有 Unity 官方 MCP 工具。你的目標是建立一個「可運行、2D可視化、可驗證」的 Unity 2D 場景。
+
+  2D 專案強制防禦規則：
+  - 本專案是 2D 專案！絕對禁止建立 3D Cube、3D Sphere 等帶有 MeshRenderer/MeshFilter 的物件。
+  - 變更顏色時，絕對禁止呼叫 `MeshRenderer.sharedMaterial.color`。你必須取得 "SpriteRenderer" 組件，並直接修改其 ".color" 屬性。
+  - 2D 場景使用 2D 光源（來自 UnityEngine.Rendering.Universal 命名空間的 Light2D）。絕對禁止建立 3D 的 Directional Light。
+
+  冪等與續跑（強制）：
+  - 每步一律「先檢查現狀」，再決定是否動手。
+  - 若目標已滿足：用 MCP 讀取驗證即可，在回覆中明確寫「已存在，跳過建立」並結束本任務。
+  - 若先前步驟中斷後重跑，假設 Editor 內已有部分成果，勿從零重做。
+
+  Unity 2D 基本場景常識：
+  - 2D 相機的 Projection 必須是 Orthographic（正交）。
+  - 2D 物件的 Z 軸通常為 0。相機的 Z 軸通常設為 -10，以便由外往內看整個 2D 平面。
+
+  Tool 使用規則：
+  - 修改 2D 屬性：優先使用 unity__Unity_RunCommand 編譯執行內聯 C# 程式碼，直接取得 SpriteRenderer 並修改其屬性。
+
+###############################################################################
+# EXECUTION STRATEGY
+###############################################################################
+
+execution_strategy:
+  mode: "goal_driven"
+  priorities:
+    - correctness_2d
+    - scene_visibility
+    - editor_consistency
+    - recoverability
+
+###############################################################################
+# TASKS
+###############################################################################
+
+tasks:
+
+  ###########################################################################
+  # CREATE 2D SCENE
+  ###########################################################################
+
+  - id: create_2d_scene
+    title: 建立 2D 範例場景
+    objective: 建立新的 Unity 2D Scene 作為本次示範場景。
+    prompt: |
+      請透過 MCP 工具完成。若下列條件已滿足，勿重複建立，僅驗證並回報「已存在，跳過」：
+      1. 檢查 Assets/_Scenes 是否存在。若不存在則建立此資料夾。
+      2. 檢查 Assets/_Scenes/Example2DScene.unity 是否已存在。
+         - 若已存在：載入該場景、設為 Active Scene。
+         - 若不存在：建立新 Scene 並儲存為 Assets/_Scenes/Example2DScene.unity。
+      3. 確認目前 Active Scene 為 Example2DScene。
+
+  ###########################################################################
+  # ENSURE 2D CAMERA
+  ###########################################################################
+
+  - id: ensure_2d_camera
+    title: 確保 2D 正交相機存在
+    objective: 確保場景具有符合 2D 遊戲配置的正交相機。
+    prompt: |
+      先以 MCP 檢查場景是否已有 Main Camera。
+      若已存在且符合正交 (Orthographic) 配置，回報「Camera 已存在，跳過建立」。
+
+      若不存在或不符，請建立或將其調整為 2D 建議配置：
+      - Tag: MainCamera
+      - Camera.orthographic: true (開啟正交模式，這是 2D 的靈魂)
+      - Transform 配置：
+        Position: { x: 0, y: 0, z: -10 }
+        Rotation: { x: 0, y: 0, z: 0 }
+        Scale: { x: 1, y: 1, z: 1 }
+
+  ###########################################################################
+  # ENSURE 2D LIGHTING
+  ###########################################################################
+
+  - id: ensure_2d_light
+    title: 確保 2D 光源存在
+    objective: 確保 URP 2D 材質有基本光照，避免畫面漆黑。
+    prompt: |
+      先檢查場景中是否已有 2D 光源（例如名為 "Global Light 2D" 的物件，或帶有 Light2D 元件的物件）。
+      若已有 2D 光源且為 Active：回報「2D Light 已存在，跳過建立」。
+
+      若不存在：
+      - 建立一個新的 GameObject 名為 "Global Light 2D"。
+      - 為其掛載 URP 2D 的光源組件（提示：在 C# 中使用 `gameObject.AddComponent<UnityEngine.Rendering.Universal.Light2D>()`）。
+      - 將其類型設為 Global (`lightType = Light2D.LightType.Global`)，以照亮整個 2D 平面。
+
+  ###########################################################################
+  # CREATE 2D SPRITE OBJECT
+  ###########################################################################
+
+  - id: create_2d_sprite_object
+    title: 建立 2D 矩形物件
+    objective: 在場景中央建立一個用於 2D 渲染的 Sprite 物件。
+    prompt: |
+      先以 MCP 檢查場景中是否已有名為 "RedSquare2D" 的 GameObject。
+      若已存在且擁有 SpriteRenderer，回報「2D 物件已存在，跳過建立」。
+
+      僅在不存在時建立：
+      - Name: RedSquare2D
+      - 元件：必須掛載 `SpriteRenderer`（禁止掛載 3D 的 MeshRenderer）。
+      - 為 SpriteRenderer 指派 Unity 內建的預設方形圖片（提示：C# 中可透過 `AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd")` 取得預設白方塊 Sprite，指派給 `sprite` 屬性）。
+      - Transform 配置（置中）：
+        Position: { x: 0, y: 0, z: 0 }
+        Scale: { x: 1, y: 1, z: 1 }
+
+  ###########################################################################
+  # SET SPRITE RED (2D WAY)
+  ###########################################################################
+
+  - id: set_sprite_red
+    title: 修改 Sprite 顏色為純紅
+    objective: 使用正確的 2D API 將 Sprite 改為紅色。
+    prompt: |
+      先檢查 "RedSquare2D" 的 SpriteRenderer 顏色是否已是紅色。
+      若已是紅色：回報「已是紅色，跳過修改」。
+
+      若仍為白色或預設色：
+      - 透過執行內聯 C# 程式碼（unity__Unity_RunCommand），獲取 "RedSquare2D" 物件上的 `SpriteRenderer` 組件。
+      - 直接將其 `color` 屬性設為純紅色：`spriteRenderer.color = new Color(1f, 0f, 0f, 1f);`。
+      - 嚴禁觸碰 sharedMaterial.color。
+
+  ###########################################################################
+  # FINAL 2D VALIDATION
+  ###########################################################################
+
+  - id: validate_2d_scene
+    title: 最終 2D 場景驗證
+    objective: 確保整個 2D 場景無缺失項目且符合 DoD。
+    prompt: |
+      對照 definition_of_done 進行全面 JSON 數據審查：
+      - 檢查場景儲存路徑是否為 Assets/_Scenes/Example2DScene.unity
+      - 驗證 Main Camera 的 orthographic 是否為 true，Z 軸是否為 -10
+      - 驗證 RedSquare2D 的 SpriteRenderer 是否存在，且 color 欄位精準為 (1, 0, 0, 1)
+      - 檢查有無任何 Missing Reference 或 3D 殘留組件
+
+      若一切正常，儲存場景，並詳細回報：
+      1. 2D 相機狀態
+      2. SpriteRenderer 顏色屬性值
+      3. 確認 2D 工作流建構成功！
