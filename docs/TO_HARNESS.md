@@ -10,6 +10,120 @@
 
 ---
 
+## 執行清單（逐條勾選）
+
+建議依序執行；**0.5 與階段 1 可並行**。完成後在 `[ ]` 改為 `[x]`。細節與驗證方式見下方各階段章節。
+
+### 階段 0 — 命名與文件
+
+- [x] **0.1** `pyproject.toml`：`name` → `unity-mcp-harness`；entry points 可保留 `unity-mcp-build`
+- [x] **0.2** `README.md`：Harness 定位 + 連結 `HARNESS.md`、`TO_HARNESS.md`
+- [x] **0.3** `docs/NOTE.md` 架構圖：`workflow.py` → `build_workflow.py`
+
+### 階段 0.5 — UnityMCPRunner 歸位（harness ← aicentral-agent）
+
+- [ ] **0.5** 遷入 `mcp_build.py` → `harness/mcp_runner.py`（或 `unity_common`）；遷入 `tests/test_mcp_runner.py`；更新 `pyproject` 套件佈局
+- [ ] **0.5.2a** `build_workflow.py` 改 import 本 repo，移除 `aicentral_agent.mcp_build`
+- [ ] **0.5.2b** `unity_common.create_unity_chat` 單一註冊路徑
+- [ ] **0.5.2c** `pyproject.toml` 視情況移除 `aicentral-agent` 依賴
+- [ ] **0.5.2d** `scripts/build_exe.ps1` 移除 `--collect-submodules aicentral_agent`
+- [ ] **0.5.3a** aicentral-agent：刪除或 deprecated `mcp_build.py`
+- [ ] **0.5.3b** aicentral-agent `__init__.py` 移除 Unity 相關匯出
+- [ ] **0.5.3c** aicentral-agent：刪除 `tests/test_mcp_build.py`
+- [ ] **0.5.3d** aicentral-agent README：改指向 unity-mcp-harness
+- [ ] **0.5.3e**（可選）deprecated re-export + `DeprecationWarning`
+- [ ] **0.5.4a** `HARNESS.md` §0.1 MCP 層描述更新
+- [ ] **0.5.4b** `NOTE.md` 架構圖更新
+- [ ] **0.5✓** monorepo 搜尋 `aicentral_agent.mcp_build` / `UnityMCPRunner` 匯入為零（或僅 deprecated）
+
+### 階段 1 — 執行期 SSOT 資料模型
+
+- [ ] **1.1** `core/pipeline/schema.py`：`HarnessTask`、`PipelineRecords`、`TaskListDocument`
+- [ ] **1.2** `task_list.example.yaml`
+- [ ] **1.3** `core/pipeline/store.py`：`load_task_list` / `save_task_list`（原子寫入）
+- [ ] **1.4** `.gitignore` 加入 `task_list.yaml`
+- [ ] **1.5** `schema`：`NormalizedPlan`、`plan_revision`、`plan_source_id`、`plan_changelog`
+
+### 階段 1.5 — 藍圖規範化（Plan Normalize）
+
+- [ ] **1.5.1** `core/pipeline/plan_normalize.py`：`normalize_plan()`
+- [ ] **1.5.2** 結構化輸出：`normalized_tasks[]` + `plan_changelog`
+- [ ] **1.5.3** 支援 3 條粗任務 → N 條子任務
+- [ ] **1.5.4** 啟動鏈：`load_build_goals` → `normalize_plan` → `bootstrap`；`--skip-plan-normalize`
+- [ ] **1.5.5** CLI `--replan`
+- [ ] **1.5.6**（可選）`--write-back-goals` / `--backup`
+- [ ] **1.5.7**（可選）`--plan-with-mcp`
+- [ ] **1.5.8** `tests/test_plan_normalize.py`
+
+### 階段 2 — Bootstrap 執行隊列
+
+- [ ] **2.1** `bootstrap.py`：輸入 `NormalizedPlan` → `task_list.yaml`
+- [ ] **2.2** CLI：`--init-tasks` 或啟動時 normalize → bootstrap；`--dry-run` 預覽
+
+### 階段 3 — 執行期 Prompt（軟 Harness）
+
+- [ ] **3.1** `core/pipeline/context.py`：SSOT 摘要格式化
+- [ ] **3.2** 擴充 `format_task_prompt` + HARNESS CoT
+- [ ] **3.3** 執行 prompt 以 `task_list` 為準（非原始藍圖 `tasks[].prompt`）
+- [ ] **3.4** 憲法留 `system_context`；逐步 CoT 由 Normalize 寫入各任務
+
+### 階段 4 — LangGraph + 每步落盤
+
+- [ ] **4.1** `core/pipeline/runner.py`：`on_task_start` / `on_task_end` + 本 repo `UnityMCPRunner`
+- [ ] **4.2** `build_workflow._run_single_task` 掛 hook + `save_task_list`
+- [ ] **4.3** `run_build.py` 依 `task_list` 取下一個非 `completed` 任務
+
+### 階段 5 — 斷點續傳
+
+- [ ] **5.1** `get_next_runnable_task()`；`--retry-failed`（可選）
+- [ ] **5.2** 重啟後 prompt 強制重新 Phase 1 感知
+
+### 階段 6 — 結構化感知/驗證（硬 Harness）
+
+- [ ] **6.1** `core/pipeline/tool_adapter.py`：Read/Write 慣例 + `operations_executed`
+- [ ] **6.2** 任務欄位 `harness.pre_read` / `harness.post_read`
+- [ ] **6.3** 失敗 → `status: failed`、`verification: failed`
+- [ ] **6.4** 冪等跳過 → `verification: skipped_by_idempotent`
+
+### 階段 7 — 執行期動態任務注入
+
+- [ ] **7.1** `store.inject_subtask()`
+- [ ] **7.2** `[HARNESS_INJECT:...]` 或 tool 觸發
+- [ ] **7.3** `get_next_runnable_task` 尊重 `priority` / 插入序
+
+### 階段 8 — 藍圖同步
+
+- [ ] **8.1** CLI `sync-plan` / `--sync-plan`（normalize + 合併至 task_list）
+- [ ] **8.2** `--write-back-goals`：僅寫回規劃期欄位，不寫 `actual_*` / `verification`
+- [ ] **8.3** 維護指南：何時 `--replan` / 改 task_list / 寫回藍圖
+
+### 階段 9 — 測試與可觀測性
+
+- [ ] **9.1** `test_pipeline_store.py`、`test_bootstrap.py`
+- [ ] **9.2** `--dry-run`：normalize + bootstrap 或讀既有 task_list
+- [ ] **9.3**（可選）`--json` 含 `verification`
+- [ ] **9.4** `test_plan_normalize_writeback.py`
+
+### 階段 10 — 中長期（可並行規劃，非 v1 必須）
+
+- [ ] **10.1** Unity Editor：精簡 inspector / filters
+- [ ] **10.2** `Execute_Undo` / Phase 3 回滾
+- [ ] **10.3** HTTP MCP 長連線
+- [ ] **10.4** 持久 MCP session（aicentral）
+- [ ] **10.5** CLI 更名 `unity-mcp-harness`
+
+### Harness v1 完成定義（全部滿足即 v1）
+
+- [ ] **DoD-1** 啟動時 Plan Normalize → bootstrap `task_list.yaml`
+- [ ] **DoD-2** 每步結束更新 `status`、`operations_executed`
+- [ ] **DoD-3** 重跑跳過 `completed`，續跑 `pending`
+- [ ] **DoD-4** 粗藍圖 + `--replan` / `sync-plan` / 可選寫回，無需重編 exe
+- [ ] **DoD-5** `HARNESS.md` 與 `core/pipeline` 模組一致
+- [ ] **DoD-6** 2D 範例整合路徑跑通，`validate_2d_scene` 落盤 `verification`
+- [ ] **DoD-7** 不依賴 aicentral-agent Unity 模組
+
+---
+
 ## 階段 0：對齊命名與文件（低風險）
 
 | # | 工作項 | 產出 | 驗證 |
@@ -197,7 +311,7 @@
 |---|--------|------|------|
 | 9.1 | `tests/test_pipeline_store.py`、`test_bootstrap.py` | 無 Unity 單測 | `pytest` 通過 |
 | 9.2 | `unity-mcp-build --dry-run`：`normalize` + bootstrap 預覽（或讀既有 `task_list`） | 乾跑一致 | 列出 N 任務、`plan_revision`、status |
-| 9.4 | `tests/test_plan_normalize_writeback.py`：`--write-back-goals` 不破坏 YAML 結構 | 寫回安全 | roundtrip parse |
+| 9.4 | `tests/test_plan_normalize_writeback.py`：`--write-back-goals` 不破壞 YAML 結構 | 寫回安全 | roundtrip parse |
 | 9.3 | 可選：`--json` 輸出含每任務 `verification` | 利於 CI | — |
 
 ---
