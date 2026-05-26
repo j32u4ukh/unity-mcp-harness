@@ -1,10 +1,20 @@
-# unity-mcp
+# unity-mcp-harness
 
-透過 [aicentral](../aicentral) 呼叫 **Unity MCP Server**，並可依 **任務清單** 在 Unity Editor 內逐步完成建構。
+**Unity MCP Harness** 在 Unity Editor 上透過 [aicentral](../aicentral) 與 Coplay Unity MCP，依任務清單逐步完成建構。相對「發射後不管」的 Agent，Harness 目標是 **感知 → 行動 → 驗證 → 持久化** 的閉環，並以執行期 `task_list.yaml` 作為狀態來源（規格與路線圖見下方文件）。
 
-完整使用說明（腳本呼叫鏈、任務定義、設定檔分工）見：
+| 檔案 | 角色 |
+|------|------|
+| `build_goals.yaml` | **建構藍圖**（意圖、DoD、粗粒度任務；人類/Cursor 維護） |
+| `task_list.yaml` | **執行期 SSOT**（狀態、感知紀錄、驗證；Harness 執行時產生，規劃中） |
 
-**[docs/README.md](docs/README.md)**
+完整使用說明（腳本呼叫鏈、任務定義、設定檔分工）見 **[docs/README.md](docs/README.md)**。
+
+### 規格與遷移
+
+- **[docs/HARNESS.md](docs/HARNESS.md)** — 框架規格（藍圖 vs 執行期、Phase 1–4、Plan Normalize）
+- **[docs/TO_HARNESS.md](docs/TO_HARNESS.md)** — 由現況到 Harness v1 的實作清單（可逐條勾選）
+
+CLI 入口點仍為 `unity-mcp-build` 等（與舊 `unity-mcp` 相容）；套件名為 `unity-mcp-harness`。
 
 ---
 
@@ -18,7 +28,7 @@ Copy-Item config\secret.yaml.example config\secret.yaml
 # 建構預設 LLM 為 gemini-flash，請在 secret.yaml 填入 gemini.api_key
 pip install -e ".[mcp]"
 
-cd ..\unity-mcp
+cd ..\unity-mcp-harness
 pip install -e .
 ```
 
@@ -43,7 +53,7 @@ pip install -e .
 
 **HTTP（可選）** — 複製 `unity_servers.example.json`；須在 Unity 內啟動 MCP Server（例如 `http://localhost:8080/mcp`）。Cursor 若用 HTTP 可參考 [docs/cursor-mcp.http.example.json](docs/cursor-mcp.http.example.json)。
 
-**Cursor IDE**：`%USERPROFILE%\.cursor\mcp.json` 可與上列 stdio（`command`/`args`）或 HTTP（`url`）擇一；**unity-mcp CLI** 一律讀本專案 `unity_servers.json`（aicentral 格式，含 `transport`）。
+**Cursor IDE**：`%USERPROFILE%\.cursor\mcp.json` 可與上列 stdio（`command`/`args`）或 HTTP（`url`）擇一；**Harness CLI** 一律讀本專案 `unity_servers.json`（aicentral 格式，含 `transport`）。
 
 ### 3. 多任務建構（主要流程）
 
@@ -68,7 +78,7 @@ unity-mcp-build
 
 | 檔案 | 用途 |
 |------|------|
-| `build_goals.yaml` | 建構任務清單（自 example 複製） |
+| `build_goals.yaml` | 建構藍圖 / 任務清單（自 example 複製） |
 | `unity_servers.json` | Unity MCP 連線（自 example 複製；stdio 見 `unity_servers.stdio.example.json`） |
 | `run_build.py` | `unity-mcp-build` 入口 |
 | `build_workflow.py` | LangGraph 依序執行任務 |
@@ -91,6 +101,8 @@ pip install pyinstaller
 
 ## 文件
 
+- [docs/HARNESS.md](docs/HARNESS.md) — Harness 框架規格
+- [docs/TO_HARNESS.md](docs/TO_HARNESS.md) — 遷移與實作清單
 - [docs/README.md](docs/README.md) — 使用方式、呼叫鏈、任務定義
 - [docs/BUILD.md](docs/BUILD.md) — 建構工作流補充
 - [docs/NOTE.md](docs/NOTE.md) — 踩坑紀錄與自建 Agent 建議

@@ -1,7 +1,7 @@
 [project]
-name = "unity-mcp"
+name = "unity-mcp-harness"
 version = "0.2.0"
-description = "Unity MCP + LangGraph 建構工作流（任務清單依序執行，LLM 經 aicentral）"
+description = "Unity MCP Harness：藍圖驅動的 LangGraph 建構工作流（閉環感知/驗證、執行期 SSOT，LLM 經 aicentral）"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

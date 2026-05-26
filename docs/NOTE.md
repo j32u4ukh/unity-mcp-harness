@@ -9,7 +9,7 @@
 ```
 build_goals.yaml  →  tasks.py（組 prompt）
        ↓
-workflow.py / unity-mcp-build  →  aicentral-agent UnityMCPRunner
+build_workflow.py / unity-mcp-build  →  aicentral-agent UnityMCPRunner
        ↓
 aicentral Chat.with_mcp + MCP tool loop
        ↓
@@ -19,8 +19,8 @@ Unity Editor（MCP for Unity）
 ```
 
 - **aicentral**：LLM 路由 + MCP orchestrator（`complete_with_mcp_loop`）。
-- **aicentral-agent**：`create_unity_mcp_runner` / `UnityMCPRunner`（建構用 MCP 橋接）。
-- **unity-mcp**：任務 YAML、LangGraph 順序編排、`unity_servers.json` 載入與 CLI。
+- **aicentral-agent**：`create_unity_mcp_runner` / `UnityMCPRunner`（建構用 MCP 橋接；規劃遷入 harness，見 [TO_HARNESS.md](./TO_HARNESS.md) 階段 0.5）。
+- **unity-mcp-harness**：任務 YAML、LangGraph 順序編排（`build_workflow.py`）、`unity_servers.json` 載入與 CLI。
 
 ---
 
