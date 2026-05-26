@@ -1,4 +1,4 @@
-"""LangGraph 工作流：依序執行建構任務，每步經 aicentral-agent + aicentral MCP。"""
+"""LangGraph 工作流：依序執行建構任務，每步經 harness MCP runner + aicentral。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing_extensions import TypedDict
 from aicentral.exceptions import ProviderError
 from aicentral.mcp import MCPError
 
-from aicentral_agent.mcp_build import UnityMCPRunner, create_unity_mcp_runner
+from harness.mcp_runner import UnityMCPRunner, create_unity_mcp_runner
 
 from tasks import BuildPlan, BuildTask, TaskResult, format_task_prompt
 from unity_common import (
@@ -40,7 +40,7 @@ def _run_single_task(
     runner: UnityMCPRunner,
     default_servers: list[str],
 ) -> TaskResult:
-    """執行單一任務：aicentral-agent runner → aicentral Chat.with_mcp。"""
+    """執行單一任務：UnityMCPRunner → aicentral Chat.with_mcp。"""
     prompt = format_task_prompt(task, plan=plan, prior_results=prior)
     try:
         if task.mcp_servers:
@@ -128,9 +128,9 @@ def build_sequential_workflow(
     unity_config_path: str | Path | None = None,
     stop_on_error: bool = True,
 ) -> Any:
-    """編譯 LangGraph：依 plan 順序執行任務；執行層為 aicentral-agent ``UnityMCPRunner``。
+    """編譯 LangGraph：依 plan 順序執行任務；執行層為 ``harness.mcp_runner.UnityMCPRunner``。
 
-    編排：LangGraph（unity-mcp）+ LLM/MCP：aicentral-agent → aicentral ``Chat.with_mcp``。
+    編排：LangGraph（unity-mcp-harness）+ LLM/MCP：aicentral ``Chat.with_mcp``。
     """
     register_unity_servers(specs, config_path=unity_config_path)
     mcp_servers = plan.mcp_servers

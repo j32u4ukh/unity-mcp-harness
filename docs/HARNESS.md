@@ -18,7 +18,7 @@
 | 建構意圖 | `build_goals.yaml` | 靜態任務清單、`goal`、`definition_of_done`、`system_context`、各任務 `prompt` |
 | 任務載入 | `tasks.py` | 解析 YAML、組裝每步 LLM prompt（含已完成任務摘要） |
 | 編排 | `build_workflow.py` | LangGraph **單次行程**依序執行各任務 |
-| MCP + LLM | `unity_common.py` → aicentral `Chat.with_mcp` → aicentral-agent `UnityMCPRunner` | 註冊 `unity_servers.json`、tool loop |
+| MCP + LLM | `unity_common.py` + `harness/mcp_runner.py` → aicentral `Chat.with_mcp` | 註冊 `unity_servers.json`、tool loop |
 | 入口 | `run_build.py` / `unity-mcp-build` | CLI；可打包為 `unity-mcp-build.exe` |
 | Unity 連線 | Coplay **Unity MCP**（stdio `relay_win.exe` 或 HTTP） | 實際 Editor 工具，如 `Unity_ListResources`、`Unity_RunCommand` 等 |
 

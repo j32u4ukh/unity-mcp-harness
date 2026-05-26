@@ -1,0 +1,90 @@
+# 執行期 SSOT 範本（可提交版控）。實際執行產生的 task_list.yaml 請加入 .gitignore。
+# 任務 id 對齊 build_goals.yaml 六步 2D 範例。
+
+project_name: "Unity 2D Example Scene — Red Sprite Demo"
+harness_version: 1
+last_updated: "2026-05-25T22:00:00Z"
+current_lifecycle_phase: "Scene_Verification"
+source_plan: "build_goals.yaml"
+plan_revision: 1
+plan_normalized_at: "2026-05-25T21:50:00Z"
+
+tasks:
+  - id: create_2d_scene
+    description: 建立並啟用 Example2DScene
+    status: pending
+    priority: 10
+    prompt: |
+      （由 Plan Normalize 或 bootstrap 自 build_goals 填入完整 prompt）
+    target:
+      scene_path: "Assets/_Scenes/Example2DScene.unity"
+    harness:
+      pre_read: "Unity_ListResources 檢查 Assets/_Scenes/Example2DScene.unity"
+    pipeline_records:
+      actual_before: {}
+      operations_executed: []
+      actual_after: {}
+    verification: pending
+    injected_by: null
+    plan_source_id: create_2d_scene
+
+  - id: ensure_2d_camera
+    description: 確保 2D 正交相機存在
+    status: pending
+    priority: 20
+    prompt: ""
+    pipeline_records:
+      actual_before: {}
+      operations_executed: []
+      actual_after: {}
+    verification: pending
+
+  - id: ensure_2d_light
+    description: 確保 2D 光源存在
+    status: pending
+    priority: 30
+    prompt: ""
+    pipeline_records:
+      actual_before: {}
+      operations_executed: []
+      actual_after: {}
+    verification: pending
+
+  - id: create_2d_sprite_object
+    description: 建立 2D 矩形物件 RedSquare2D
+    status: pending
+    priority: 40
+    prompt: ""
+    target:
+      game_object: "RedSquare2D"
+    pipeline_records:
+      actual_before: {}
+      operations_executed: []
+      actual_after: {}
+    verification: pending
+
+  - id: set_sprite_red
+    description: 將 Sprite 顏色設為純紅
+    status: pending
+    priority: 50
+    prompt: ""
+    target:
+      game_object: "RedSquare2D"
+    pipeline_records:
+      actual_before: {}
+      operations_executed: []
+      actual_after: {}
+    verification: pending
+
+  - id: validate_2d_scene
+    description: 最終 2D 場景驗證
+    status: pending
+    priority: 60
+    prompt: ""
+    harness:
+      post_read: "唯讀驗證 Main Camera orthographic、SpriteRenderer.color"
+    pipeline_records:
+      actual_before: {}
+      operations_executed: []
+      actual_after: {}
+    verification: pending

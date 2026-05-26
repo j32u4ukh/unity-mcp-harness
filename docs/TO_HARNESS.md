@@ -22,27 +22,27 @@
 
 ### 階段 0.5 — UnityMCPRunner 歸位（harness ← aicentral-agent）
 
-- [ ] **0.5** 遷入 `mcp_build.py` → `harness/mcp_runner.py`（或 `unity_common`）；遷入 `tests/test_mcp_runner.py`；更新 `pyproject` 套件佈局
-- [ ] **0.5.2a** `build_workflow.py` 改 import 本 repo，移除 `aicentral_agent.mcp_build`
-- [ ] **0.5.2b** `unity_common.create_unity_chat` 單一註冊路徑
-- [ ] **0.5.2c** `pyproject.toml` 視情況移除 `aicentral-agent` 依賴
-- [ ] **0.5.2d** `scripts/build_exe.ps1` 移除 `--collect-submodules aicentral_agent`
-- [ ] **0.5.3a** aicentral-agent：刪除或 deprecated `mcp_build.py`
-- [ ] **0.5.3b** aicentral-agent `__init__.py` 移除 Unity 相關匯出
-- [ ] **0.5.3c** aicentral-agent：刪除 `tests/test_mcp_build.py`
-- [ ] **0.5.3d** aicentral-agent README：改指向 unity-mcp-harness
+- [x] **0.5** 遷入 `mcp_build.py` → `harness/mcp_runner.py`（或 `unity_common`）；遷入 `tests/test_mcp_runner.py`；更新 `pyproject` 套件佈局
+- [x] **0.5.2a** `build_workflow.py` 改 import 本 repo，移除 `aicentral_agent.mcp_build`
+- [x] **0.5.2b** `unity_common.create_unity_chat` 單一註冊路徑
+- [x] **0.5.2c** `pyproject.toml` 視情況移除 `aicentral-agent` 依賴
+- [x] **0.5.2d** `scripts/build_exe.ps1` 移除 `--collect-submodules aicentral_agent`
+- [x] **0.5.3a** aicentral-agent：刪除或 deprecated `mcp_build.py`
+- [x] **0.5.3b** aicentral-agent `__init__.py` 移除 Unity 相關匯出
+- [x] **0.5.3c** aicentral-agent：刪除 `tests/test_mcp_build.py`
+- [x] **0.5.3d** aicentral-agent README：改指向 unity-mcp-harness
 - [ ] **0.5.3e**（可選）deprecated re-export + `DeprecationWarning`
-- [ ] **0.5.4a** `HARNESS.md` §0.1 MCP 層描述更新
-- [ ] **0.5.4b** `NOTE.md` 架構圖更新
-- [ ] **0.5✓** monorepo 搜尋 `aicentral_agent.mcp_build` / `UnityMCPRunner` 匯入為零（或僅 deprecated）
+- [x] **0.5.4a** `HARNESS.md` §0.1 MCP 層描述更新
+- [x] **0.5.4b** `NOTE.md` 架構圖更新
+- [x] **0.5✓** monorepo 搜尋 `aicentral_agent.mcp_build` / `UnityMCPRunner` 匯入為零（或僅 deprecated）
 
 ### 階段 1 — 執行期 SSOT 資料模型
 
-- [ ] **1.1** `core/pipeline/schema.py`：`HarnessTask`、`PipelineRecords`、`TaskListDocument`
-- [ ] **1.2** `task_list.example.yaml`
-- [ ] **1.3** `core/pipeline/store.py`：`load_task_list` / `save_task_list`（原子寫入）
-- [ ] **1.4** `.gitignore` 加入 `task_list.yaml`
-- [ ] **1.5** `schema`：`NormalizedPlan`、`plan_revision`、`plan_source_id`、`plan_changelog`
+- [x] **1.1** `core/pipeline/schema.py`：`HarnessTask`、`PipelineRecords`、`TaskListDocument`
+- [x] **1.2** `task_list.example.yaml`
+- [x] **1.3** `core/pipeline/store.py`：`load_task_list` / `save_task_list`（原子寫入）
+- [x] **1.4** `.gitignore` 加入 `task_list.yaml`
+- [x] **1.5** `schema`：`NormalizedPlan`、`plan_revision`、`plan_source_id`、`plan_changelog`
 
 ### 階段 1.5 — 藍圖規範化（Plan Normalize）
 

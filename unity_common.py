@@ -308,14 +308,14 @@ def create_unity_chat(
     specs: dict[str, dict[str, Any]] | None = None,
     config_path: Path | str | None = None,
 ) -> Chat:
-    """註冊 Unity MCP 並建立已啟用 tool loop 的 Chat（經 aicentral-agent）。"""
-    from aicentral_agent.mcp_build import create_unity_mcp_runner
+    """註冊 Unity MCP 並建立已啟用 tool loop 的 Chat（經 harness ``UnityMCPRunner``）。"""
+    from harness.mcp_runner import create_unity_mcp_runner
 
     resolved = specs if specs is not None else resolve_server_specs(config_path=config_path)
     register_unity_servers(resolved, config_path=config_path)
     runner = create_unity_mcp_runner(
         mcp_servers,
-        model=model,
+        model=resolve_unity_llm_model(model),
         max_tool_rounds=max_tool_rounds,
         include_tool_messages_in_history=include_tool_messages_in_history,
     )

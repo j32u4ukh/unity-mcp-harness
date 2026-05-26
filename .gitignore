@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Harness 執行期 SSOT（保留 task_list.example.yaml）
+task_list.yaml
+task_list.yaml.tmp
