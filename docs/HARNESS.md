@@ -31,8 +31,8 @@
 
 | 能力 | 現況 | Harness 目標 |
 |------|------|----------------|
-| 藍圖任務定義 | 完全依賴 YAML 撰寫品質 | 載入後 **Plan Normalize**（LLM 一次）補齊 Harness 欄位、可拆分子任務 |
-| 藍圖 ↔ 執行隊列 | 直接 `tasks.py` 讀 `build_goals` | 規範化結果 → `task_list`；可選 **寫回** `build_goals.yaml` |
+| 藍圖任務定義 | 完全依賴 YAML 撰寫品質 | **`core/pipeline/plan_normalize`**（LLM 或 passthrough）補齊 Harness 欄位、可拆分子任務 |
+| 藍圖 ↔ 執行隊列 | 直接 `tasks.py` 讀 `build_goals` | **`bootstrap`** → `task_list`；`run_build --write-back-goals` 可寫回藍圖 |
 | 執行期 SSOT | 僅記憶體內 `TaskResult` | `task_list.yaml` 即時更新 |
 | 操作前感知 | Prompt 要求 Agent 自行讀取 | Phase 1 狀態寫入 `pipeline_records.actual_before` |
 | 操作後驗證 | Prompt + 文字回覆 | Phase 3 比對 `actual_after` vs 預期，寫入 `verification` |

@@ -3,10 +3,10 @@
 本文件依 [HARNESS.md](./HARNESS.md) 規格，列出**由現況（Agent + Unity MCP）到可運作 Harness（閉環 + 持久化）**的建議實作順序。  
 每步完成後應可獨立驗證；不必一次做完 §5–§9 才開始使用 CLI。
 
-**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、Coplay MCP；**尚無** `task_list.yaml`、`core/pipeline`、**Plan Normalize（藍圖 LLM 規範化）**、框架級執行期 Phase 落盤。  
-**設計要點**：人類撰寫的 `build_goals.yaml` 不必逐條符合 HARNESS 執行契約；啟動時須先經 LLM 規範化（可 3 任務→N 任務、可選寫回藍圖），再 bootstrap 至 `task_list.yaml`（見 HARNESS §2.1、階段 1.5）。
+**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、`harness/mcp_runner`、`core/pipeline`（schema/store/plan_normalize/bootstrap）、Coplay MCP；**已具備** Plan Normalize + bootstrap 至 `task_list.yaml`（`run_build` 啟動鏈）；**尚無** 框架級執行期 Phase 落盤（階段 4+）、執行期仍以 `build_goals` 驅動 LangGraph。  
+**設計要點**：人類撰寫的 `build_goals.yaml` 不必逐條符合 HARNESS 執行契約；無 `task_list.yaml` 或 `--replan` 時會 LLM 規範化（可 3→N）再 bootstrap（見 HARNESS §2.1、階段 1.5）。
 
-**跨套件債務**：`UnityMCPRunner` 等 Unity 專用程式碼目前放在 **aicentral-agent**（`mcp_build.py`），但唯一消費者是 **unity-mcp-harness**（`build_workflow.py`、`unity_common.create_unity_chat`），與 aicentral-agent「通用 LangGraph 編排、不實作 MCP」的定位不符，應遷回本 repo（見階段 0.5）。
+**跨套件債務（0.5 已完成）**：`UnityMCPRunner` 已遷入 **unity-mcp-harness**；aicentral-agent 僅保留通用 LangGraph。
 
 ---
 
@@ -46,19 +46,19 @@
 
 ### 階段 1.5 — 藍圖規範化（Plan Normalize）
 
-- [ ] **1.5.1** `core/pipeline/plan_normalize.py`：`normalize_plan()`
-- [ ] **1.5.2** 結構化輸出：`normalized_tasks[]` + `plan_changelog`
-- [ ] **1.5.3** 支援 3 條粗任務 → N 條子任務
-- [ ] **1.5.4** 啟動鏈：`load_build_goals` → `normalize_plan` → `bootstrap`；`--skip-plan-normalize`
-- [ ] **1.5.5** CLI `--replan`
-- [ ] **1.5.6**（可選）`--write-back-goals` / `--backup`
-- [ ] **1.5.7**（可選）`--plan-with-mcp`
-- [ ] **1.5.8** `tests/test_plan_normalize.py`
+- [x] **1.5.1** `core/pipeline/plan_normalize.py`：`normalize_plan()`
+- [x] **1.5.2** 結構化輸出：`normalized_tasks[]` + `plan_changelog`
+- [x] **1.5.3** 支援 3 條粗任務 → N 條子任務
+- [x] **1.5.4** 啟動鏈：`prepare_harness_queue` → normalize → bootstrap；`--skip-plan-normalize`
+- [x] **1.5.5** CLI `--replan` / `--init-tasks`
+- [x] **1.5.6**（可選）`--write-back-goals` / `--backup`
+- [x] **1.5.7**（可選）`--plan-with-mcp`
+- [x] **1.5.8** `tests/test_plan_normalize.py`、`tests/test_bootstrap.py`
 
 ### 階段 2 — Bootstrap 執行隊列
 
-- [ ] **2.1** `bootstrap.py`：輸入 `NormalizedPlan` → `task_list.yaml`
-- [ ] **2.2** CLI：`--init-tasks` 或啟動時 normalize → bootstrap；`--dry-run` 預覽
+- [x] **2.1** `bootstrap.py`：輸入 `NormalizedPlan` → `task_list.yaml`（含 replan 保留 completed）
+- [x] **2.2** CLI：`--init-tasks` / `--replan`；`--dry-run` 顯示 plan_revision 與 task_list
 
 ### 階段 3 — 執行期 Prompt（軟 Harness）
 
