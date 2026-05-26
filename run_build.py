@@ -7,8 +7,9 @@ import argparse
 import json
 import sys
 
-from core.pipeline.execution import build_plan_for_execution
+from core.pipeline.execution import build_plan_for_execution, get_next_runnable_task
 from core.pipeline.prepare import prepare_harness_queue
+from core.pipeline.store import load_task_list
 from unity_common import (
     handle_errors,
     print_banner,
@@ -143,8 +144,14 @@ def main() -> None:
             specs=specs,
         )
         plan = prepared.build_plan
-        execution_plan = build_plan_for_execution(plan, prepared.task_list)
+        task_list_path = prepared.task_list_path
+        if task_list_path.is_file():
+            task_list = load_task_list(task_list_path)
+        else:
+            task_list = prepared.task_list
+        execution_plan = build_plan_for_execution(plan, task_list)
         resume = not prepared.created_task_list
+        next_task = get_next_runnable_task(task_list)
     except Exception as exc:
         handle_errors(exc)
         sys.exit(1)
@@ -160,6 +167,14 @@ def main() -> None:
     )
     _print_plan_summary(plan)
     _print_harness_summary(prepared)
+    if next_task is not None:
+        runnable = execution_plan.enabled_tasks()
+        print(
+            f"\n下一個執行任務: [{next_task.id}] status={next_task.status} "
+            f"（本輪共 {len(runnable)} 個待跑）"
+        )
+    else:
+        print("\n（無待執行任務：全部 completed / skipped）")
 
     if args.dry_run:
         print("\n（dry-run：未執行 Unity MCP 建構）")
@@ -173,7 +188,8 @@ def main() -> None:
             specs=specs,
             unity_config_path=args.unity_config,
             stop_on_error=not args.continue_on_error,
-            task_list=prepared.task_list,
+            task_list=task_list,
+            task_list_path=task_list_path,
             resume=resume,
         )
     except Exception as exc:
@@ -194,6 +210,13 @@ def main() -> None:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         _print_results(results)
+
+    if task_list_path.is_file():
+        final_doc = load_task_list(task_list_path)
+        print("task_list 狀態（落盤後）:")
+        for t in final_doc.tasks:
+            ops = len(t.pipeline_records.operations_executed)
+            print(f"  [{t.id}] status={t.status} verification={t.verification} ops={ops}")
 
     if results and not all(r.success for r in results):
         sys.exit(1)

@@ -31,6 +31,12 @@ def harness_tasks_by_id(doc: TaskListDocument) -> dict[str, HarnessTask]:
     return {t.id: t for t in doc.tasks}
 
 
+def get_next_runnable_task(doc: TaskListDocument) -> HarnessTask | None:
+    """下一個待執行任務（依 priority）；無則 ``None``。"""
+    runnable = sorted_runnable_tasks(doc)
+    return runnable[0] if runnable else None
+
+
 def build_plan_for_execution(
     blueprint: BuildPlan,
     task_list: TaskListDocument,

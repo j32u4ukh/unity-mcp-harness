@@ -15,7 +15,9 @@ from aicentral.mcp import MCPError
 from harness.mcp_runner import UnityMCPRunner, create_unity_mcp_runner
 
 from core.pipeline.execution import harness_tasks_by_id
+from core.pipeline.runner import HarnessTaskRunner
 from core.pipeline.schema import HarnessTask, TaskListDocument
+from core.pipeline.store import default_task_list_path
 from tasks import BuildPlan, BuildTask, TaskResult, format_task_prompt
 from unity_common import (
     ask_unity,
@@ -45,8 +47,12 @@ def _run_single_task(
     default_servers: list[str],
     harness_task: HarnessTask | None = None,
     resume: bool = False,
+    pipeline_runner: HarnessTaskRunner | None = None,
 ) -> TaskResult:
     """執行單一任務：UnityMCPRunner → aicentral Chat.with_mcp。"""
+    if pipeline_runner is not None:
+        harness_task = pipeline_runner.on_task_start(task.id)
+
     prompt = format_task_prompt(
         task,
         plan=plan,
@@ -65,27 +71,32 @@ def _run_single_task(
         else:
             reply = runner.ask(prompt)
         if task_reply_indicates_failure(reply):
-            return TaskResult(
+            result = TaskResult(
                 id=task.id,
                 title=task.title,
                 success=False,
                 reply=reply,
                 error=task_failure_summary(reply),
             )
-        return TaskResult(
-            id=task.id,
-            title=task.title,
-            success=True,
-            reply=reply,
-        )
+        else:
+            result = TaskResult(
+                id=task.id,
+                title=task.title,
+                success=True,
+                reply=reply,
+            )
     except (MCPError, ProviderError) as exc:
-        return TaskResult(
+        result = TaskResult(
             id=task.id,
             title=task.title,
             success=False,
             reply="",
             error=str(exc),
         )
+
+    if pipeline_runner is not None:
+        pipeline_runner.on_task_end(task.id, result)
+    return result
 
 
 def _make_run_task_node(
@@ -94,6 +105,7 @@ def _make_run_task_node(
     *,
     harness_by_id: dict[str, HarnessTask],
     resume: bool,
+    pipeline_runner: HarnessTaskRunner | None = None,
 ):
     """建立閉包節點：讀取 state 中當前 task_index 並執行。"""
 
@@ -106,6 +118,8 @@ def _make_run_task_node(
         task = tasks[index]
         prior = list(state.get("results", []))
         ht = harness_by_id.get(task.id)
+        if pipeline_runner is not None:
+            ht = pipeline_runner.get_task(task.id)
         result = _run_single_task(
             task,
             plan=plan,
@@ -114,7 +128,10 @@ def _make_run_task_node(
             default_servers=mcp_servers,
             harness_task=ht,
             resume=state.get("resume", resume),
+            pipeline_runner=pipeline_runner,
         )
+        if pipeline_runner is not None:
+            harness_by_id[task.id] = pipeline_runner.get_task(task.id)
         return {
             "results": [result],
             "task_index": index + 1,
@@ -147,6 +164,7 @@ def build_sequential_workflow(
     unity_config_path: str | Path | None = None,
     stop_on_error: bool = True,
     task_list: TaskListDocument | None = None,
+    task_list_path: str | Path | None = None,
     resume: bool = False,
 ) -> Any:
     """編譯 LangGraph：依 plan / task_list 順序執行任務。"""
@@ -160,6 +178,14 @@ def build_sequential_workflow(
     )
 
     harness_by_id = harness_tasks_by_id(task_list) if task_list else {}
+    pipeline_runner: HarnessTaskRunner | None = None
+    if task_list is not None:
+        list_path = Path(task_list_path) if task_list_path is not None else default_task_list_path()
+        pipeline_runner = HarnessTaskRunner(
+            task_list,
+            list_path,
+            unity_runner=runner,
+        )
 
     graph = StateGraph(BuildState)
     run_node = _make_run_task_node(
@@ -167,6 +193,7 @@ def build_sequential_workflow(
         mcp_servers,
         harness_by_id=harness_by_id,
         resume=resume,
+        pipeline_runner=pipeline_runner,
     )
     graph.add_node("run_task", run_node)
     graph.add_edge(START, "run_task")
@@ -185,6 +212,7 @@ def run_build_plan(
     unity_config_path: str | Path | None = None,
     stop_on_error: bool = True,
     task_list: TaskListDocument | None = None,
+    task_list_path: str | Path | None = None,
     resume: bool = False,
 ) -> list[TaskResult]:
     """執行整份建構計畫並回傳各任務結果。
@@ -197,6 +225,7 @@ def run_build_plan(
         unity_config_path=unity_config_path,
         stop_on_error=stop_on_error,
         task_list=task_list,
+        task_list_path=task_list_path,
         resume=resume,
     )
     harness_by_id = harness_tasks_by_id(task_list) if task_list else {}

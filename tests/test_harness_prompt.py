@@ -1,6 +1,6 @@
 """執行期 prompt（task_list + Harness 上下文）測試。"""
 
-from core.pipeline.execution import build_plan_for_execution
+from core.pipeline.execution import build_plan_for_execution, get_next_runnable_task
 from core.pipeline.schema import HarnessHints, HarnessTask, PipelineRecords, TaskListDocument
 from tasks import BuildPlan, BuildTask, format_task_prompt
 
@@ -47,3 +47,15 @@ def test_build_plan_for_execution_skips_completed() -> None:
     ids = [t.id for t in exec_plan.enabled_tasks()]
     assert ids == ["first", "next"]
     assert exec_plan.enabled_tasks()[0].prompt == "first"
+
+
+def test_get_next_runnable_task_skips_completed() -> None:
+    doc = TaskListDocument(
+        tasks=[
+            HarnessTask(id="done", description="d", prompt="p", status="completed"),
+            HarnessTask(id="next", description="n", prompt="p", status="pending", priority=5),
+        ]
+    )
+    nxt = get_next_runnable_task(doc)
+    assert nxt is not None
+    assert nxt.id == "next"

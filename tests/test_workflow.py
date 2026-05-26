@@ -1,9 +1,12 @@
 """build_workflow 單元測試（mock Chat）。"""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from build_workflow import run_build_plan
+from core.pipeline.execution import build_plan_for_execution
 from core.pipeline.schema import HarnessTask, PipelineRecords, TaskListDocument
+from core.pipeline.store import load_task_list
 from tasks import BuildPlan, BuildTask
 
 
@@ -95,8 +98,6 @@ def test_run_build_plan_injects_harness_context(
             )
         ]
     )
-    from core.pipeline.execution import build_plan_for_execution
-
     exec_plan = build_plan_for_execution(blueprint, task_list)
     run_build_plan(exec_plan, task_list=task_list, resume=True)
 
@@ -105,3 +106,36 @@ def test_run_build_plan_injects_harness_context(
     assert "blueprint-only" not in prompt_sent
     assert "Harness 執行期狀態" in prompt_sent
     assert "重啟提醒" in prompt_sent
+
+
+@patch("build_workflow.create_unity_mcp_runner")
+@patch("build_workflow.register_unity_servers")
+def test_run_build_plan_persists_task_list(
+    mock_reg: MagicMock, mock_runner_factory: MagicMock, tmp_path: Path
+) -> None:
+    mock_runner = MagicMock()
+    mock_runner.ask.return_value = "完成"
+    mock_runner_factory.return_value = mock_runner
+
+    task_list = TaskListDocument(
+        tasks=[
+            HarnessTask(id="a", description="d", prompt="do a", status="pending"),
+            HarnessTask(id="b", description="d", prompt="do b", status="completed"),
+        ]
+    )
+    path = tmp_path / "task_list.yaml"
+    blueprint = BuildPlan(project="P", tasks=[])
+    exec_plan = build_plan_for_execution(blueprint, task_list)
+
+    run_build_plan(
+        exec_plan,
+        task_list=task_list,
+        task_list_path=path,
+    )
+
+    loaded = load_task_list(path)
+    by_id = {t.id: t for t in loaded.tasks}
+    assert by_id["a"].status == "completed"
+    assert by_id["a"].verification == "verified"
+    assert by_id["b"].status == "completed"
+    assert mock_runner.ask.call_count == 1

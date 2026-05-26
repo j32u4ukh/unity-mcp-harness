@@ -17,16 +17,21 @@ from core.pipeline.plan_normalize import (
 from core.pipeline.context import format_harness_task_context, format_pipeline_records_summary
 from core.pipeline.execution import (
     build_plan_for_execution,
+    get_next_runnable_task,
     harness_task_to_build_task,
     sorted_runnable_tasks,
 )
+from core.pipeline.runner import HarnessTaskRunner, classify_task_outcome
 from core.pipeline.prepare import HarnessPrepareResult, prepare_harness_queue
 from core.pipeline.store import default_task_list_path, load_task_list, save_task_list
 
 __all__ = [
     "HarnessPrepareResult",
     "bootstrap_task_list",
+    "HarnessTaskRunner",
     "build_plan_for_execution",
+    "classify_task_outcome",
+    "get_next_runnable_task",
     "format_harness_task_context",
     "format_pipeline_records_summary",
     "harness_task_to_build_task",
