@@ -1,0 +1,49 @@
+"""執行期 prompt（task_list + Harness 上下文）測試。"""
+
+from core.pipeline.execution import build_plan_for_execution
+from core.pipeline.schema import HarnessHints, HarnessTask, PipelineRecords, TaskListDocument
+from tasks import BuildPlan, BuildTask, format_task_prompt
+
+
+def test_format_task_prompt_uses_task_list_prompt_not_blueprint() -> None:
+    blueprint = BuildPlan(
+        project="P",
+        system_context="2D 憲法",
+        tasks=[BuildTask(id="t1", title="藍圖", prompt="藍圖粗 prompt")],
+    )
+    harness = HarnessTask(
+        id="t1",
+        description="執行描述",
+        title="執行標題",
+        prompt="task_list 規範化 prompt：先讀再寫",
+        harness=HarnessHints(pre_read="Unity_ListResources"),
+        pipeline_records=PipelineRecords(actual_before={"ready": False}),
+    )
+    task = BuildTask(id="t1", title="x", prompt=harness.prompt, objective=harness.description)
+    text = format_task_prompt(
+        task,
+        plan=blueprint,
+        prior_results=[],
+        harness_task=harness,
+    )
+    assert "task_list 規範化 prompt" in text
+    assert "藍圖粗 prompt" not in text
+    assert "2D 憲法" in text
+    assert "Unity_ListResources" in text
+    assert "actual_before" in text
+
+
+def test_build_plan_for_execution_skips_completed() -> None:
+    blueprint = BuildPlan(project="P", tasks=[])
+    doc = TaskListDocument(
+        project_name="P",
+        tasks=[
+            HarnessTask(id="done", description="d", prompt="p", status="completed"),
+            HarnessTask(id="next", description="n", prompt="run me", status="pending", priority=20),
+            HarnessTask(id="first", description="f", prompt="first", status="pending", priority=10),
+        ],
+    )
+    exec_plan = build_plan_for_execution(blueprint, doc)
+    ids = [t.id for t in exec_plan.enabled_tasks()]
+    assert ids == ["first", "next"]
+    assert exec_plan.enabled_tasks()[0].prompt == "first"

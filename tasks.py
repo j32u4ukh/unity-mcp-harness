@@ -14,6 +14,11 @@ from unity_common import project_root
 LOCAL_GOALS_FILE = "build_goals.yaml"
 ENV_GOALS_PATH = "UNITY_BUILD_GOALS"
 VALIDATE_TASK_ID = "validate_scene"
+VALIDATE_TASK_IDS = frozenset({VALIDATE_TASK_ID, "validate_2d_scene"})
+
+
+def is_validate_task(task_id: str) -> bool:
+    return task_id in VALIDATE_TASK_IDS
 
 
 @dataclass
@@ -202,8 +207,17 @@ def format_task_prompt(
     *,
     plan: BuildPlan,
     prior_results: list[TaskResult],
+    harness_task: Any | None = None,
+    resume: bool = False,
 ) -> str:
-    """組裝送給 Unity MCP Chat 的單任務提示（含 goal、DoD、策略與已完成摘要）。"""
+    """組裝送給 Unity MCP Chat 的單任務提示（含 goal、DoD、Harness SSOT 與已完成摘要）。
+
+    當提供 ``harness_task`` 時，【本任務要求】使用 task_list 內已規範化的 ``prompt``（見
+    ``harness_task_to_build_task``），並注入 ``pipeline_records`` 摘要。
+    """
+    from core.pipeline.context import format_harness_task_context
+    from core.pipeline.schema import HarnessTask
+
     lines = [
         f"【Unity 建構任務】{task.id} — {task.title}",
         f"【專案】{plan.project}",
@@ -217,7 +231,7 @@ def format_task_prompt(
         lines.extend(["", "【執行策略】", strategy_text])
 
     dod_heading = "【完成定義（Definition of Done）】"
-    if task.id == VALIDATE_TASK_ID and plan.definition_of_done:
+    if is_validate_task(task.id) and plan.definition_of_done:
         lines.extend(
             [
                 "",
@@ -237,10 +251,31 @@ def format_task_prompt(
     if plan.system_context:
         lines.extend(["", "【Agent 憲法 / 整體情境】", plan.system_context])
 
+    if harness_task is not None and isinstance(harness_task, HarnessTask):
+        lines.extend(
+            [
+                "",
+                format_harness_task_context(harness_task, resume=resume),
+            ]
+        )
+    elif resume:
+        lines.extend(
+            [
+                "",
+                "【Harness】",
+                "重啟後須重新 Phase 1 感知（即使先前文字摘要存在）。",
+            ]
+        )
+
     if task.objective:
         lines.extend(["", "【本任務目標】", task.objective])
 
-    lines.extend(["", "【本任務要求】", task.prompt])
+    req_heading = (
+        "【本任務要求（來自 task_list 規範化 prompt）】"
+        if harness_task is not None
+        else "【本任務要求】"
+    )
+    lines.extend(["", req_heading, task.prompt])
 
     if prior_results:
         lines.append("")

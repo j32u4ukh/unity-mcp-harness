@@ -14,6 +14,8 @@ from aicentral.mcp import MCPError
 
 from harness.mcp_runner import UnityMCPRunner, create_unity_mcp_runner
 
+from core.pipeline.execution import harness_tasks_by_id
+from core.pipeline.schema import HarnessTask, TaskListDocument
 from tasks import BuildPlan, BuildTask, TaskResult, format_task_prompt
 from unity_common import (
     ask_unity,
@@ -30,6 +32,8 @@ class BuildState(TypedDict):
     task_index: int
     results: Annotated[list[TaskResult], operator.add]
     stop_on_error: bool
+    harness_by_id: dict[str, HarnessTask]
+    resume: bool
 
 
 def _run_single_task(
@@ -39,12 +43,19 @@ def _run_single_task(
     prior: list[TaskResult],
     runner: UnityMCPRunner,
     default_servers: list[str],
+    harness_task: HarnessTask | None = None,
+    resume: bool = False,
 ) -> TaskResult:
     """執行單一任務：UnityMCPRunner → aicentral Chat.with_mcp。"""
-    prompt = format_task_prompt(task, plan=plan, prior_results=prior)
+    prompt = format_task_prompt(
+        task,
+        plan=plan,
+        prior_results=prior,
+        harness_task=harness_task,
+        resume=resume,
+    )
     try:
         if task.mcp_servers:
-            # 任務指定不同 MCP server 時獨立呼叫（不共用 Chat 歷史）
             reply = ask_unity(
                 prompt,
                 mcp_servers=task.mcp_servers,
@@ -52,7 +63,6 @@ def _run_single_task(
                 max_tool_rounds=plan.max_tool_rounds,
             )
         else:
-            # 使用同一 Chat 工作階段，保留跨任務 MCP / 對話脈絡
             reply = runner.ask(prompt)
         if task_reply_indicates_failure(reply):
             return TaskResult(
@@ -78,7 +88,13 @@ def _run_single_task(
         )
 
 
-def _make_run_task_node(runner: UnityMCPRunner, mcp_servers: list[str]):
+def _make_run_task_node(
+    runner: UnityMCPRunner,
+    mcp_servers: list[str],
+    *,
+    harness_by_id: dict[str, HarnessTask],
+    resume: bool,
+):
     """建立閉包節點：讀取 state 中當前 task_index 並執行。"""
 
     def run_task(state: BuildState) -> dict[str, Any]:
@@ -89,12 +105,15 @@ def _make_run_task_node(runner: UnityMCPRunner, mcp_servers: list[str]):
             return {}
         task = tasks[index]
         prior = list(state.get("results", []))
+        ht = harness_by_id.get(task.id)
         result = _run_single_task(
             task,
             plan=plan,
             prior=prior,
             runner=runner,
             default_servers=mcp_servers,
+            harness_task=ht,
+            resume=state.get("resume", resume),
         )
         return {
             "results": [result],
@@ -127,11 +146,10 @@ def build_sequential_workflow(
     specs: dict | None = None,
     unity_config_path: str | Path | None = None,
     stop_on_error: bool = True,
+    task_list: TaskListDocument | None = None,
+    resume: bool = False,
 ) -> Any:
-    """編譯 LangGraph：依 plan 順序執行任務；執行層為 ``harness.mcp_runner.UnityMCPRunner``。
-
-    編排：LangGraph（unity-mcp-harness）+ LLM/MCP：aicentral ``Chat.with_mcp``。
-    """
+    """編譯 LangGraph：依 plan / task_list 順序執行任務。"""
     register_unity_servers(specs, config_path=unity_config_path)
     mcp_servers = plan.mcp_servers
     runner = create_unity_mcp_runner(
@@ -141,8 +159,15 @@ def build_sequential_workflow(
         include_tool_messages_in_history=True,
     )
 
+    harness_by_id = harness_tasks_by_id(task_list) if task_list else {}
+
     graph = StateGraph(BuildState)
-    run_node = _make_run_task_node(runner, mcp_servers)
+    run_node = _make_run_task_node(
+        runner,
+        mcp_servers,
+        harness_by_id=harness_by_id,
+        resume=resume,
+    )
     graph.add_node("run_task", run_node)
     graph.add_edge(START, "run_task")
     graph.add_conditional_edges(
@@ -159,19 +184,29 @@ def run_build_plan(
     specs: dict | None = None,
     unity_config_path: str | Path | None = None,
     stop_on_error: bool = True,
+    task_list: TaskListDocument | None = None,
+    resume: bool = False,
 ) -> list[TaskResult]:
-    """執行整份建構計畫並回傳各任務結果。"""
+    """執行整份建構計畫並回傳各任務結果。
+
+    若提供 ``task_list``，任務順序與 prompt 以 SSOT 為準（``build_plan_for_execution``）。
+    """
     graph = build_sequential_workflow(
         plan,
         specs=specs,
         unity_config_path=unity_config_path,
         stop_on_error=stop_on_error,
+        task_list=task_list,
+        resume=resume,
     )
+    harness_by_id = harness_tasks_by_id(task_list) if task_list else {}
     initial: BuildState = {
         "plan": plan,
         "task_index": 0,
         "results": [],
         "stop_on_error": stop_on_error,
+        "harness_by_id": harness_by_id,
+        "resume": resume,
     }
     final = graph.invoke(initial)
     return list(final.get("results", []))

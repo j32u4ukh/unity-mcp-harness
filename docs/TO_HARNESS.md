@@ -3,7 +3,7 @@
 本文件依 [HARNESS.md](./HARNESS.md) 規格，列出**由現況（Agent + Unity MCP）到可運作 Harness（閉環 + 持久化）**的建議實作順序。  
 每步完成後應可獨立驗證；不必一次做完 §5–§9 才開始使用 CLI。
 
-**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、`harness/mcp_runner`、`core/pipeline`（schema/store/plan_normalize/bootstrap）、Coplay MCP；**已具備** Plan Normalize + bootstrap 至 `task_list.yaml`（`run_build` 啟動鏈）；**尚無** 框架級執行期 Phase 落盤（階段 4+）、執行期仍以 `build_goals` 驅動 LangGraph。  
+**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、`harness/mcp_runner`、`core/pipeline`（schema/store/plan_normalize/bootstrap）、Coplay MCP；**已具備** Plan Normalize + bootstrap 至 `task_list.yaml`（`run_build` 啟動鏈）；**已具備** 執行期 prompt 以 `task_list` 為準 + Harness 上下文注入（階段 3）；**尚無** 框架級每步落盤（階段 4+）。  
 **設計要點**：人類撰寫的 `build_goals.yaml` 不必逐條符合 HARNESS 執行契約；無 `task_list.yaml` 或 `--replan` 時會 LLM 規範化（可 3→N）再 bootstrap（見 HARNESS §2.1、階段 1.5）。
 
 **跨套件債務（0.5 已完成）**：`UnityMCPRunner` 已遷入 **unity-mcp-harness**；aicentral-agent 僅保留通用 LangGraph。
@@ -62,10 +62,10 @@
 
 ### 階段 3 — 執行期 Prompt（軟 Harness）
 
-- [ ] **3.1** `core/pipeline/context.py`：SSOT 摘要格式化
-- [ ] **3.2** 擴充 `format_task_prompt` + HARNESS CoT
-- [ ] **3.3** 執行 prompt 以 `task_list` 為準（非原始藍圖 `tasks[].prompt`）
-- [ ] **3.4** 憲法留 `system_context`；逐步 CoT 由 Normalize 寫入各任務
+- [x] **3.1** `core/pipeline/context.py`：SSOT 摘要格式化
+- [x] **3.2** 擴充 `format_task_prompt` + HARNESS CoT
+- [x] **3.3** 執行 prompt 以 `task_list` 為準（非原始藍圖 `tasks[].prompt`）
+- [x] **3.4** 憲法留 `system_context`；逐步 CoT 由 Normalize 寫入各任務
 
 ### 階段 4 — LangGraph + 每步落盤
 

@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 
+from core.pipeline.execution import build_plan_for_execution
 from core.pipeline.prepare import prepare_harness_queue
 from unity_common import (
     handle_errors,
@@ -142,6 +143,8 @@ def main() -> None:
             specs=specs,
         )
         plan = prepared.build_plan
+        execution_plan = build_plan_for_execution(plan, prepared.task_list)
+        resume = not prepared.created_task_list
     except Exception as exc:
         handle_errors(exc)
         sys.exit(1)
@@ -166,10 +169,12 @@ def main() -> None:
 
     try:
         results = run_build_plan(
-            plan,
+            execution_plan,
             specs=specs,
             unity_config_path=args.unity_config,
             stop_on_error=not args.continue_on_error,
+            task_list=prepared.task_list,
+            resume=resume,
         )
     except Exception as exc:
         handle_errors(exc)
