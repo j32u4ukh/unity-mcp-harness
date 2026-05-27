@@ -98,6 +98,29 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _results_to_json_payload(results, *, task_list=None) -> list[dict]:
+    """將任務結果轉為 JSON 輸出；可附帶 task_list 的驗證欄位。"""
+    by_id = {}
+    if task_list is not None:
+        by_id = {t.id: t for t in task_list.tasks}
+    payload = []
+    for r in results:
+        item = {
+            "id": r.id,
+            "title": r.title,
+            "success": r.success,
+            "reply": r.reply,
+            "error": r.error,
+        }
+        task = by_id.get(r.id)
+        if task is not None:
+            item["status"] = task.status
+            item["verification"] = task.verification
+            item["operations_executed"] = len(task.pipeline_records.operations_executed)
+        payload.append(item)
+    return payload
+
+
 def _print_plan_summary(plan) -> None:
     tasks = plan.enabled_tasks()
     print(f"專案: {plan.project}")
@@ -221,16 +244,8 @@ def main() -> None:
         sys.exit(1)
 
     if args.json:
-        payload = [
-            {
-                "id": r.id,
-                "title": r.title,
-                "success": r.success,
-                "reply": r.reply,
-                "error": r.error,
-            }
-            for r in results
-        ]
+        final_doc = load_task_list(task_list_path) if task_list_path.is_file() else task_list
+        payload = _results_to_json_payload(results, task_list=final_doc)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         _print_results(results)
