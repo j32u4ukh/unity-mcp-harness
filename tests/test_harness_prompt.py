@@ -109,3 +109,16 @@ def test_get_next_runnable_task_can_retry_failed() -> None:
     nxt = get_next_runnable_task(doc, retry_failed=True)
     assert nxt is not None
     assert nxt.id == "failed"
+
+
+def test_build_plan_for_execution_respects_insertion_order_on_same_priority() -> None:
+    blueprint = BuildPlan(project="P", tasks=[])
+    doc = TaskListDocument(
+        tasks=[
+            HarnessTask(id="parent", description="p", prompt="p", status="pending", priority=10),
+            HarnessTask(id="child", description="c", prompt="c", status="pending", priority=10),
+        ]
+    )
+    exec_plan = build_plan_for_execution(blueprint, doc)
+    ids = [t.id for t in exec_plan.enabled_tasks()]
+    assert ids == ["parent", "child"]

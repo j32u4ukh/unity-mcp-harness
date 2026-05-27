@@ -292,6 +292,8 @@ def format_task_prompt(
             "",
             "請透過 Unity MCP 工具實際修改 Editor 內容完成任務。",
             "Scene 一律使用 Assets/_Scenes/（勿用 Assets/Scenes）。",
+            "若發現缺前置條件，請在回覆加入 "
+            "[HARNESS_INJECT:{\"id\":\"...\",\"description\":\"...\",\"prompt\":\"...\",\"priority\":9}]。",
             "回覆須包含工具回傳結果（成功/失敗、路徑、物件名），勿只寫「嘗試」。",
             "完成後用繁體中文簡述你執行了哪些操作與目前場景狀態。",
         ]

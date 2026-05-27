@@ -12,7 +12,7 @@ from core.pipeline.schema import (
     PipelineRecords,
     TaskListDocument,
 )
-from core.pipeline.store import load_task_list, save_task_list
+from core.pipeline.store import inject_subtask, load_task_list, save_task_list
 
 
 def test_normalized_plan_roundtrip() -> None:
@@ -78,3 +78,23 @@ def test_load_example_yaml() -> None:
     assert len(doc.tasks) == 6
     ids = {t.id for t in doc.tasks}
     assert "validate_2d_scene" in ids
+
+
+def test_inject_subtask_inserts_after_parent() -> None:
+    doc = TaskListDocument(
+        tasks=[
+            HarnessTask(id="parent", description="p", prompt="p", priority=20),
+            HarnessTask(id="later", description="l", prompt="l", priority=20),
+        ]
+    )
+    sub = inject_subtask(
+        doc,
+        "parent",
+        {
+            "id": "child",
+            "description": "c",
+            "prompt": "do child",
+        },
+    )
+    assert sub.injected_by == "parent"
+    assert [t.id for t in doc.tasks] == ["parent", "child", "later"]

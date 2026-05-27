@@ -29,7 +29,7 @@ from core.pipeline.tool_adapter import (
     plan_pre_read,
 )
 from core.pipeline.prepare import HarnessPrepareResult, prepare_harness_queue
-from core.pipeline.store import default_task_list_path, load_task_list, save_task_list
+from core.pipeline.store import default_task_list_path, inject_subtask, load_task_list, save_task_list
 
 __all__ = [
     "HarnessPrepareResult",
@@ -59,5 +59,6 @@ __all__ = [
     "TaskListDocument",
     "default_task_list_path",
     "load_task_list",
+    "inject_subtask",
     "save_task_list",
 ]

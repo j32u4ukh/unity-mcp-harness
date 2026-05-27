@@ -29,8 +29,9 @@ def sorted_runnable_tasks(
 ) -> list[HarnessTask]:
     """依 priority 排序可執行任務；預設略過 ``failed``。"""
     statuses = RETRY_FAILED_RUNNABLE_STATUSES if retry_failed else DEFAULT_RUNNABLE_STATUSES
-    runnable = [t for t in doc.tasks if t.status in statuses]
-    return sorted(runnable, key=lambda t: (t.priority, t.id))
+    runnable = [(idx, t) for idx, t in enumerate(doc.tasks) if t.status in statuses]
+    # 相同 priority 時保留插入序（含 inject_subtask 動態插入順序）
+    return [t for _, t in sorted(runnable, key=lambda item: (item[1].priority, item[0]))]
 
 
 def harness_tasks_by_id(doc: TaskListDocument) -> dict[str, HarnessTask]:

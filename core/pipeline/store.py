@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from core.pipeline.schema import TaskListDocument
+from core.pipeline.schema import HarnessTask, TaskListDocument
 
 TASK_LIST_FILENAME = "task_list.yaml"
 
@@ -45,3 +45,43 @@ def save_task_list(
     tmp.write_text(payload, encoding="utf-8")
     tmp.replace(p)
     return p
+
+
+def inject_subtask(
+    document: TaskListDocument,
+    parent_id: str,
+    subtask_spec: HarnessTask | dict,
+    *,
+    priority: int | None = None,
+) -> HarnessTask:
+    """注入執行期子任務（預設插在父任務後方）。"""
+    parent_index = -1
+    parent_task: HarnessTask | None = None
+    for idx, task in enumerate(document.tasks):
+        if task.id == parent_id:
+            parent_index = idx
+            parent_task = task
+            break
+    if parent_task is None:
+        raise KeyError(f"找不到父任務: {parent_id}")
+
+    if isinstance(subtask_spec, HarnessTask):
+        task = subtask_spec
+    elif isinstance(subtask_spec, dict):
+        payload = dict(subtask_spec)
+        payload.setdefault("status", "pending")
+        task = HarnessTask.from_dict(payload)
+    else:
+        raise TypeError("subtask_spec 必須為 HarnessTask 或 dict")
+
+    if any(t.id == task.id for t in document.tasks):
+        raise ValueError(f"重複任務 id: {task.id}")
+
+    task.injected_by = parent_id
+    if priority is not None:
+        task.priority = int(priority)
+    elif task.priority == 10:
+        task.priority = max(0, parent_task.priority - 1)
+
+    document.tasks.insert(parent_index + 1, task)
+    return task

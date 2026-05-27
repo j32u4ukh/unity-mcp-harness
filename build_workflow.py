@@ -14,7 +14,7 @@ from aicentral.mcp import MCPError
 
 from harness.mcp_runner import UnityMCPRunner, create_unity_mcp_runner
 
-from core.pipeline.execution import harness_tasks_by_id
+from core.pipeline.execution import get_next_runnable_task, harness_task_to_build_task, harness_tasks_by_id
 from core.pipeline.runner import HarnessTaskRunner
 from core.pipeline.schema import HarnessTask, TaskListDocument
 from core.pipeline.store import default_task_list_path
@@ -36,6 +36,7 @@ class BuildState(TypedDict):
     stop_on_error: bool
     harness_by_id: dict[str, HarnessTask]
     resume: bool
+    has_next: bool
 
 
 def _run_single_task(
@@ -111,15 +112,22 @@ def _make_run_task_node(
 
     def run_task(state: BuildState) -> dict[str, Any]:
         plan = state["plan"]
-        tasks = plan.enabled_tasks()
-        index = state["task_index"]
-        if index >= len(tasks):
-            return {}
-        task = tasks[index]
-        prior = list(state.get("results", []))
-        ht = harness_by_id.get(task.id)
+        task: BuildTask
+        ht: HarnessTask | None
         if pipeline_runner is not None:
-            ht = pipeline_runner.get_task(task.id)
+            next_ht = get_next_runnable_task(pipeline_runner.document)
+            if next_ht is None:
+                return {"has_next": False}
+            task = harness_task_to_build_task(next_ht)
+            ht = next_ht
+        else:
+            tasks = plan.enabled_tasks()
+            index = state["task_index"]
+            if index >= len(tasks):
+                return {"has_next": False}
+            task = tasks[index]
+            ht = harness_by_id.get(task.id)
+        prior = list(state.get("results", []))
         result = _run_single_task(
             task,
             plan=plan,
@@ -132,9 +140,15 @@ def _make_run_task_node(
         )
         if pipeline_runner is not None:
             harness_by_id[task.id] = pipeline_runner.get_task(task.id)
+            has_next = get_next_runnable_task(pipeline_runner.document) is not None
+            next_index = state.get("task_index", 0) + 1
+        else:
+            has_next = (state["task_index"] + 1) < len(plan.enabled_tasks())
+            next_index = state["task_index"] + 1
         return {
             "results": [result],
-            "task_index": index + 1,
+            "task_index": next_index,
+            "has_next": has_next,
         }
 
     return run_task
@@ -142,11 +156,7 @@ def _make_run_task_node(
 
 def _route_after_task(state: BuildState) -> Literal["run_task", "done"]:
     """決定繼續下一任務或結束。"""
-    plan = state["plan"]
-    tasks = plan.enabled_tasks()
-    index = state["task_index"]
-
-    if index >= len(tasks):
+    if not state.get("has_next", False):
         return "done"
 
     if state.get("stop_on_error", True) and state.get("results"):
@@ -236,6 +246,7 @@ def run_build_plan(
         "stop_on_error": stop_on_error,
         "harness_by_id": harness_by_id,
         "resume": resume,
+        "has_next": True,
     }
     final = graph.invoke(initial)
     return list(final.get("results", []))

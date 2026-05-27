@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from harness.mcp_runner import UnityMCPRunner
 
 from core.pipeline.schema import HarnessTask, OperationRecord, TaskListDocument
-from core.pipeline.store import save_task_list
+from core.pipeline.store import inject_subtask, save_task_list
 from core.pipeline.tool_adapter import (
     DEFAULT_WRITE_TOOL,
     append_operation,
@@ -24,6 +26,7 @@ IDEMPOTENT_SKIP_MARKERS = (
     "already exists, skip",
     "already exist, skip",
 )
+INJECT_MARKER_PATTERN = re.compile(r"\[HARNESS_INJECT:(?P<payload>.+?)\]")
 
 
 def utc_now_iso() -> str:
@@ -58,6 +61,23 @@ def _summarize_reply(result: TaskResult, *, max_len: int = 400) -> str:
     if len(text) <= max_len:
         return text
     return text[: max_len - 1] + "…"
+
+
+def parse_harness_injections(reply: str) -> list[dict]:
+    """解析回覆中的 ``[HARNESS_INJECT:...]`` 標記（目前支援 JSON）。"""
+    matches = INJECT_MARKER_PATTERN.findall(reply or "")
+    specs: list[dict] = []
+    for payload in matches:
+        raw = payload.strip()
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and data.get("id") and data.get("prompt"):
+            specs.append(data)
+    return specs
 
 
 class HarnessTaskRunner:
@@ -113,6 +133,19 @@ class HarnessTaskRunner:
                 "last_reply_excerpt",
                 summary[:200] if summary else "",
             )
+            injected = parse_harness_injections(result.reply)
+            for spec in injected:
+                subtask = inject_subtask(
+                    self.document,
+                    task.id,
+                    spec,
+                    priority=spec.get("priority"),
+                )
+                append_operation(
+                    task,
+                    action="Dynamic_Task_Injection",
+                    summary=f"inject {subtask.id}",
+                )
 
         self._touch_document()
         self._persist()

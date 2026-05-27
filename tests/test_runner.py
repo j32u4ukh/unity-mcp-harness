@@ -5,6 +5,7 @@ from pathlib import Path
 from core.pipeline.runner import (
     HarnessTaskRunner,
     classify_task_outcome,
+    parse_harness_injections,
     reply_indicates_idempotent_skip,
 )
 from core.pipeline.schema import HarnessTask, TaskListDocument
@@ -92,3 +93,13 @@ def test_harness_task_runner_idempotent_skip_marks_verification(tmp_path: Path) 
     task = loaded.tasks[0]
     assert task.status == "completed"
     assert task.verification == "skipped_by_idempotent"
+
+
+def test_parse_harness_injections_json_marker() -> None:
+    reply = (
+        'done [HARNESS_INJECT:{"id":"add_sprite_renderer","description":"補組件",'
+        '"prompt":"add SpriteRenderer","priority":5}]'
+    )
+    specs = parse_harness_injections(reply)
+    assert len(specs) == 1
+    assert specs[0]["id"] == "add_sprite_renderer"

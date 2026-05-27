@@ -139,3 +139,40 @@ def test_run_build_plan_persists_task_list(
     assert by_id["a"].verification == "verified"
     assert by_id["b"].status == "completed"
     assert mock_runner.ask.call_count == 1
+
+
+@patch("build_workflow.create_unity_mcp_runner")
+@patch("build_workflow.register_unity_servers")
+def test_run_build_plan_executes_injected_subtask_first(
+    mock_reg: MagicMock, mock_runner_factory: MagicMock, tmp_path: Path
+) -> None:
+    mock_runner = MagicMock()
+    mock_runner.ask.side_effect = [
+        (
+            '完成並需要前置 [HARNESS_INJECT:{"id":"child","description":"補前置",'
+            '"prompt":"do child","priority":5}]'
+        ),
+        "child done",
+    ]
+    mock_runner_factory.return_value = mock_runner
+
+    task_list = TaskListDocument(
+        tasks=[
+            HarnessTask(id="parent", description="p", prompt="do parent", status="pending", priority=10),
+        ]
+    )
+    path = tmp_path / "task_list.yaml"
+    blueprint = BuildPlan(project="P", tasks=[])
+    exec_plan = build_plan_for_execution(blueprint, task_list)
+
+    results = run_build_plan(
+        exec_plan,
+        task_list=task_list,
+        task_list_path=path,
+    )
+
+    assert [r.id for r in results] == ["parent", "child"]
+    loaded = load_task_list(path)
+    assert [t.id for t in loaded.tasks][:2] == ["parent", "child"]
+    assert loaded.tasks[1].injected_by == "parent"
+    assert mock_runner.ask.call_count == 2
