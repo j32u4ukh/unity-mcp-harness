@@ -84,6 +84,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="規劃階段先唯讀 MCP 查詢專案（預設關閉）",
     )
+    parser.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="將 failed 任務納入本輪可執行清單（預設僅 pending/in_progress）",
+    )
     return parser.parse_args()
 
 
@@ -149,9 +154,13 @@ def main() -> None:
             task_list = load_task_list(task_list_path)
         else:
             task_list = prepared.task_list
-        execution_plan = build_plan_for_execution(plan, task_list)
+        execution_plan = build_plan_for_execution(
+            plan,
+            task_list,
+            retry_failed=args.retry_failed,
+        )
         resume = not prepared.created_task_list
-        next_task = get_next_runnable_task(task_list)
+        next_task = get_next_runnable_task(task_list, retry_failed=args.retry_failed)
     except Exception as exc:
         handle_errors(exc)
         sys.exit(1)
@@ -173,6 +182,8 @@ def main() -> None:
             f"\n下一個執行任務: [{next_task.id}] status={next_task.status} "
             f"（本輪共 {len(runnable)} 個待跑）"
         )
+        if args.retry_failed:
+            print("（已啟用 --retry-failed：failed 任務會納入本輪）")
     else:
         print("\n（無待執行任務：全部 completed / skipped）")
 

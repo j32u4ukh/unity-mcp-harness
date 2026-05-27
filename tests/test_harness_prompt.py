@@ -49,6 +49,32 @@ def test_build_plan_for_execution_skips_completed() -> None:
     assert exec_plan.enabled_tasks()[0].prompt == "first"
 
 
+def test_build_plan_for_execution_skips_failed_by_default() -> None:
+    blueprint = BuildPlan(project="P", tasks=[])
+    doc = TaskListDocument(
+        tasks=[
+            HarnessTask(id="failed", description="f", prompt="retry me", status="failed", priority=1),
+            HarnessTask(id="pending", description="p", prompt="run me", status="pending", priority=10),
+        ]
+    )
+    exec_plan = build_plan_for_execution(blueprint, doc)
+    ids = [t.id for t in exec_plan.enabled_tasks()]
+    assert ids == ["pending"]
+
+
+def test_build_plan_for_execution_includes_failed_with_retry_flag() -> None:
+    blueprint = BuildPlan(project="P", tasks=[])
+    doc = TaskListDocument(
+        tasks=[
+            HarnessTask(id="failed", description="f", prompt="retry me", status="failed", priority=1),
+            HarnessTask(id="pending", description="p", prompt="run me", status="pending", priority=10),
+        ]
+    )
+    exec_plan = build_plan_for_execution(blueprint, doc, retry_failed=True)
+    ids = [t.id for t in exec_plan.enabled_tasks()]
+    assert ids == ["failed", "pending"]
+
+
 def test_get_next_runnable_task_skips_completed() -> None:
     doc = TaskListDocument(
         tasks=[
@@ -59,3 +85,27 @@ def test_get_next_runnable_task_skips_completed() -> None:
     nxt = get_next_runnable_task(doc)
     assert nxt is not None
     assert nxt.id == "next"
+
+
+def test_get_next_runnable_task_skips_failed_by_default() -> None:
+    doc = TaskListDocument(
+        tasks=[
+            HarnessTask(id="failed", description="f", prompt="p", status="failed", priority=1),
+            HarnessTask(id="next", description="n", prompt="p", status="pending", priority=5),
+        ]
+    )
+    nxt = get_next_runnable_task(doc)
+    assert nxt is not None
+    assert nxt.id == "next"
+
+
+def test_get_next_runnable_task_can_retry_failed() -> None:
+    doc = TaskListDocument(
+        tasks=[
+            HarnessTask(id="failed", description="f", prompt="p", status="failed", priority=1),
+            HarnessTask(id="next", description="n", prompt="p", status="pending", priority=5),
+        ]
+    )
+    nxt = get_next_runnable_task(doc, retry_failed=True)
+    assert nxt is not None
+    assert nxt.id == "failed"
