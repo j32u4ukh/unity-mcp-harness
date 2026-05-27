@@ -9,6 +9,12 @@ from harness.mcp_runner import UnityMCPRunner
 
 from core.pipeline.schema import HarnessTask, OperationRecord, TaskListDocument
 from core.pipeline.store import save_task_list
+from core.pipeline.tool_adapter import (
+    DEFAULT_WRITE_TOOL,
+    append_operation,
+    capture_post_read_snapshot,
+    capture_pre_read_snapshot,
+)
 from tasks import TaskResult
 from unity_common import task_reply_indicates_failure
 
@@ -81,6 +87,7 @@ class HarnessTaskRunner:
         task = self.get_task(task_id)
         task.status = "in_progress"
         task.verification = "pending"
+        capture_pre_read_snapshot(task)
         self._touch_document()
         self._persist()
         return task
@@ -93,13 +100,13 @@ class HarnessTaskRunner:
 
         summary = _summarize_reply(result)
         if summary:
-            task.pipeline_records.operations_executed.append(
-                OperationRecord(
-                    timestamp=utc_now_iso(),
-                    action="MCP_Execute",
-                    summary=summary,
-                )
+            append_operation(
+                task,
+                action="MCP_Execute",
+                tool=DEFAULT_WRITE_TOOL,
+                summary=summary,
             )
+        capture_post_read_snapshot(task)
 
         if result.success and result.reply and not task_reply_indicates_failure(result.reply):
             task.pipeline_records.actual_after.setdefault(

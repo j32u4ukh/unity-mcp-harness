@@ -40,6 +40,8 @@ def test_harness_task_runner_persists_lifecycle(tmp_path: Path) -> None:
     loaded = load_task_list(path)
     assert loaded.tasks[0].status == "in_progress"
     assert loaded.last_updated is not None
+    assert loaded.tasks[0].pipeline_records.actual_before["read_plan"]
+    assert loaded.tasks[0].pipeline_records.operations_executed[0].action == "MCP_Read"
 
     result = TaskResult(id="t1", title="T", success=True, reply="場景已建立完成")
     runner.on_task_end("t1", result)
@@ -47,5 +49,46 @@ def test_harness_task_runner_persists_lifecycle(tmp_path: Path) -> None:
     task = loaded.tasks[0]
     assert task.status == "completed"
     assert task.verification == "verified"
-    assert len(task.pipeline_records.operations_executed) == 1
-    assert task.pipeline_records.operations_executed[0].action == "MCP_Execute"
+    assert task.pipeline_records.actual_after["verify_plan"]
+    assert len(task.pipeline_records.operations_executed) == 3
+    assert [op.action for op in task.pipeline_records.operations_executed] == [
+        "MCP_Read",
+        "MCP_Execute",
+        "MCP_VerifyRead",
+    ]
+
+
+def test_harness_task_runner_failed_sets_verification_failed(tmp_path: Path) -> None:
+    path = tmp_path / "task_list.yaml"
+    doc = TaskListDocument(
+        project_name="P",
+        tasks=[HarnessTask(id="t1", description="d", prompt="p", status="pending")],
+    )
+    runner = HarnessTaskRunner(doc, path)
+    runner.on_task_start("t1")
+    runner.on_task_end(
+        "t1",
+        TaskResult(id="t1", title="T", success=False, reply="", error="boom"),
+    )
+    loaded = load_task_list(path)
+    task = loaded.tasks[0]
+    assert task.status == "failed"
+    assert task.verification == "failed"
+
+
+def test_harness_task_runner_idempotent_skip_marks_verification(tmp_path: Path) -> None:
+    path = tmp_path / "task_list.yaml"
+    doc = TaskListDocument(
+        project_name="P",
+        tasks=[HarnessTask(id="t1", description="d", prompt="p", status="pending")],
+    )
+    runner = HarnessTaskRunner(doc, path)
+    runner.on_task_start("t1")
+    runner.on_task_end(
+        "t1",
+        TaskResult(id="t1", title="T", success=True, reply="2D Light 已存在，跳過建立"),
+    )
+    loaded = load_task_list(path)
+    task = loaded.tasks[0]
+    assert task.status == "completed"
+    assert task.verification == "skipped_by_idempotent"

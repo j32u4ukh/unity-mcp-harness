@@ -22,6 +22,12 @@ from core.pipeline.execution import (
     sorted_runnable_tasks,
 )
 from core.pipeline.runner import HarnessTaskRunner, classify_task_outcome
+from core.pipeline.tool_adapter import (
+    capture_post_read_snapshot,
+    capture_pre_read_snapshot,
+    plan_post_read,
+    plan_pre_read,
+)
 from core.pipeline.prepare import HarnessPrepareResult, prepare_harness_queue
 from core.pipeline.store import default_task_list_path, load_task_list, save_task_list
 
@@ -31,6 +37,8 @@ __all__ = [
     "HarnessTaskRunner",
     "build_plan_for_execution",
     "classify_task_outcome",
+    "capture_pre_read_snapshot",
+    "capture_post_read_snapshot",
     "get_next_runnable_task",
     "format_harness_task_context",
     "format_pipeline_records_summary",
@@ -40,6 +48,8 @@ __all__ = [
     "normalize_plan",
     "normalize_plan_passthrough",
     "parse_normalize_response",
+    "plan_pre_read",
+    "plan_post_read",
     "prepare_harness_queue",
     "write_back_build_goals",
     "HarnessTask",
