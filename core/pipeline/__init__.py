@@ -8,7 +8,7 @@ from core.pipeline.schema import (
     TaskListDocument,
 )
 from core.pipeline.bootstrap import bootstrap_task_list, ensure_task_list
-from core.pipeline.goals_writeback import write_back_build_goals
+from core.pipeline.goals_writeback import write_back_build_goals, write_back_task_list_goals
 from core.pipeline.plan_normalize import (
     normalize_plan,
     normalize_plan_passthrough,
@@ -52,6 +52,7 @@ __all__ = [
     "plan_post_read",
     "prepare_harness_queue",
     "write_back_build_goals",
+    "write_back_task_list_goals",
     "HarnessTask",
     "NormalizedPlan",
     "NormalizedTask",

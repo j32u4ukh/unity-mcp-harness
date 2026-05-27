@@ -3,7 +3,7 @@
 本文件依 [HARNESS.md](./HARNESS.md) 規格，列出**由現況（Agent + Unity MCP）到可運作 Harness（閉環 + 持久化）**的建議實作順序。  
 每步完成後應可獨立驗證；不必一次做完 §5–§9 才開始使用 CLI。
 
-**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、`harness/mcp_runner`、`core/pipeline`（schema/store/plan_normalize/bootstrap/runner/execution/tool_adapter）、Coplay MCP；**已具備** Plan Normalize + bootstrap 至 `task_list.yaml`（`run_build` 啟動鏈）；**已具備** 執行期 prompt 以 `task_list` 為準 + Harness 上下文注入（階段 3）、每步 `status` / `operations_executed` 落盤（階段 4）、`get_next_runnable_task` + `--retry-failed` 斷點續跑（階段 5）、Read/Write 慣例與 `pre_read`/`post_read` 記錄（階段 6）、動態注入 `inject_subtask` / `[HARNESS_INJECT:...]`（階段 7）；**尚無** 藍圖同步 CLI（階段 8+）。  
+**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、`harness/mcp_runner`、`core/pipeline`（schema/store/plan_normalize/bootstrap/runner/execution/tool_adapter）、Coplay MCP；**已具備** Plan Normalize + bootstrap 至 `task_list.yaml`（`run_build` 啟動鏈）；**已具備** 執行期 prompt 以 `task_list` 為準 + Harness 上下文注入（階段 3）、每步 `status` / `operations_executed` 落盤（階段 4）、`get_next_runnable_task` + `--retry-failed` 斷點續跑（階段 5）、Read/Write 慣例與 `pre_read`/`post_read` 記錄（階段 6）、動態注入 `inject_subtask` / `[HARNESS_INJECT:...]`（階段 7）、`--sync-plan` + task_list 規劃欄位寫回藍圖（階段 8）；**尚無** 可觀測性輸出強化（階段 9+）。  
 **設計要點**：人類撰寫的 `build_goals.yaml` 不必逐條符合 HARNESS 執行契約；無 `task_list.yaml` 或 `--replan` 時會 LLM 規範化（可 3→N）再 bootstrap（見 HARNESS §2.1、階段 1.5）。
 
 **跨套件債務（0.5 已完成）**：`UnityMCPRunner` 已遷入 **unity-mcp-harness**；aicentral-agent 僅保留通用 LangGraph。
@@ -93,9 +93,9 @@
 
 ### 階段 8 — 藍圖同步
 
-- [ ] **8.1** CLI `sync-plan` / `--sync-plan`（normalize + 合併至 task_list）
-- [ ] **8.2** `--write-back-goals`：僅寫回規劃期欄位，不寫 `actual_*` / `verification`
-- [ ] **8.3** 維護指南：何時 `--replan` / 改 task_list / 寫回藍圖
+- [x] **8.1** CLI `sync-plan` / `--sync-plan`（normalize + 合併至 task_list）
+- [x] **8.2** `--write-back-goals`：僅寫回規劃期欄位，不寫 `actual_*` / `verification`
+- [x] **8.3** 維護指南：何時 `--replan` / 改 task_list / 寫回藍圖
 
 ### 階段 9 — 測試與可觀測性
 
@@ -302,6 +302,13 @@
 | 8.1 | CLI：`sync-plan` / `--sync-plan`：人類改藍圖後，可選 **先 `normalize_plan` 再合併** 至 `task_list`，不覆寫 completed 的 `pipeline_records` | 藍圖↔隊列雙向 | 藍圖新增粗任務 → sync 出現 pending 子任務 |
 | 8.2 | 與 `--write-back-goals` 搭配：執行期穩定後將 `task_list` 中**規劃期產物**（id、prompt、harness 欄位）寫回藍圖；**不**寫回 `actual_*` / `verification` | 版控友好藍圖 | `build_goals` 任務數與上次 normalize 一致 |
 | 8.3 | 文件：何時只改粗藍圖（觸發 `--replan`）、何時直接改 `task_list`、何時寫回藍圖 | 維護指南 | HARNESS §2.1–2.3 |
+
+**維護指南（實務）**：
+
+- 只改 `build_goals.yaml` 粗藍圖後，執行 `--sync-plan`（或 `--replan`）重建/合併執行隊列。
+- 想保留既有 `completed` 的執行紀錄時，優先用 `--sync-plan`，避免手動覆寫 `task_list`。
+- 僅調整執行順序或臨時插單時，可直接修改 `task_list.yaml`（不必回寫藍圖）。
+- 需要讓藍圖與目前任務定義一致時，使用 `--sync-plan --write-back-goals`（只回寫規劃欄位）。
 
 ---
 

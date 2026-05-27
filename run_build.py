@@ -8,6 +8,7 @@ import json
 import sys
 
 from core.pipeline.execution import build_plan_for_execution, get_next_runnable_task
+from core.pipeline.goals_writeback import write_back_task_list_goals
 from core.pipeline.prepare import prepare_harness_queue
 from core.pipeline.store import load_task_list
 from unity_common import (
@@ -89,6 +90,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="將 failed 任務納入本輪可執行清單（預設僅 pending/in_progress）",
     )
+    parser.add_argument(
+        "--sync-plan",
+        action="store_true",
+        help="以最新 build_goals 規範化並同步合併至 task_list（保留 completed 紀錄）",
+    )
     return parser.parse_args()
 
 
@@ -133,7 +139,7 @@ def _print_results(results) -> None:
 def main() -> None:
     require_aicentral_config()
     args = parse_args()
-    replan = args.replan or args.init_tasks
+    replan = args.replan or args.init_tasks or args.sync_plan
 
     try:
         specs = resolve_server_specs(config_path=args.unity_config)
@@ -142,7 +148,7 @@ def main() -> None:
             skip_plan_normalize=args.skip_plan_normalize,
             replan=replan,
             init_tasks=args.init_tasks,
-            write_back_goals=args.write_back_goals,
+            write_back_goals=args.write_back_goals and not args.sync_plan,
             backup_goals=args.backup,
             plan_with_mcp=args.plan_with_mcp,
             unity_config_path=args.unity_config,
@@ -186,6 +192,13 @@ def main() -> None:
             print("（已啟用 --retry-failed：failed 任務會納入本輪）")
     else:
         print("\n（無待執行任務：全部 completed / skipped）")
+
+    if args.sync_plan:
+        if args.write_back_goals:
+            write_back_task_list_goals(task_list, args.goals, backup=args.backup)
+            print("（已將 task_list 的規劃欄位寫回 build_goals）")
+        print("\n（sync-plan：已完成藍圖與 task_list 同步，未執行 Unity MCP 建構）")
+        return
 
     if args.dry_run:
         print("\n（dry-run：未執行 Unity MCP 建構）")
