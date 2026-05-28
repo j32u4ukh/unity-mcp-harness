@@ -1,4 +1,4 @@
-# unity-mcp 使用說明
+# unity-mcp-harness 使用說明
 
 > 安裝與依賴見專案根目錄 [README.md](../README.md)。  
 > 建構工作流補充見 [BUILD.md](./BUILD.md)。
@@ -7,13 +7,13 @@
 
 ## 這個專案做什麼
 
-**unity-mcp** 讓你用 **aicentral** 呼叫 **Unity MCP Server**，在 Unity Editor 裡透過 AI 操作場景與資源。
+**unity-mcp-harness** 讓你用 **aicentral** 呼叫 **Unity MCP Server**，在 Unity Editor 裡透過 AI 操作場景與資源。
 
 主要有兩種用法：
 
 | 模式 | 適合情境 | 入口指令 |
 |------|----------|----------|
-| 多任務建構（推薦） | 依清單逐步完成場景搭建 | `unity-mcp-build` |
+| 多任務建構（推薦） | 依清單逐步完成場景搭建 | `unity-mcp-harness`（相容：`unity-mcp-build`） |
 | 互動對話 | 手動一問一答、試工具 | `unity-mcp-chat` / `unity-mcp-ask` |
 
 多任務建構會用 **LangGraph** 依 `build_goals.yaml` 的順序執行；每一步由 **LLM + Unity MCP 工具** 實際改 Editor。
@@ -33,7 +33,7 @@ cd ..\aicentral
 Copy-Item config\secret.yaml.example config\secret.yaml
 pip install -e ".[mcp]"
 
-cd ..\unity-mcp
+cd ..\unity-mcp-harness
 pip install -e .
 ```
 
@@ -46,17 +46,17 @@ pip install -e .
 ```powershell
 Copy-Item build_goals.example.yaml build_goals.yaml
 # 編輯 build_goals.yaml
-unity-mcp-build
+unity-mcp-harness
 ```
 
 對應安裝後的 entry point：`run_build.py` → `main()`。
 
 ### 呼叫鏈（誰叫誰）
 
-下面是一次 `unity-mcp-build` 執行時，由外到內的呼叫順序：
+下面是一次 `unity-mcp-harness` 執行時，由外到內的呼叫順序：
 
 ```
-unity-mcp-build
+unity-mcp-harness
 └─ run_build.py :: main()
    ├─ require_aicentral_config()          # 檢查 aicentral secret.yaml
    ├─ resolve_build_plan()              # tasks.py — 讀 build_goals.yaml
@@ -115,7 +115,7 @@ START → run_task →（條件）→ run_task → … → END
 
 | 優先序 | 來源 |
 |--------|------|
-| 1 | `unity-mcp-build -g 路徑` |
+| 1 | `unity-mcp-harness -g 路徑`（或 `unity-mcp-build -g 路徑`） |
 | 2 | 環境變數 `UNITY_BUILD_GOALS` |
 | 3 | 本目錄 `build_goals.yaml`（建議，已 gitignore） |
 | 4 | `build_goals.example.yaml`（範本） |

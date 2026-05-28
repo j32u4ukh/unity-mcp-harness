@@ -3,7 +3,7 @@
 本文件依 [HARNESS.md](./HARNESS.md) 規格，列出**由現況（Agent + Unity MCP）到可運作 Harness（閉環 + 持久化）**的建議實作順序。  
 每步完成後應可獨立驗證；不必一次做完 §5–§9 才開始使用 CLI。
 
-**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、`harness/mcp_runner`、`core/pipeline`（schema/store/plan_normalize/bootstrap/runner/execution/tool_adapter）、Coplay MCP；**已具備** Plan Normalize + bootstrap 至 `task_list.yaml`（`run_build` 啟動鏈）；**已具備** 執行期 prompt 以 `task_list` 為準 + Harness 上下文注入（階段 3）、每步 `status` / `operations_executed` 落盤（階段 4）、`get_next_runnable_task` + `--retry-failed` 斷點續跑（階段 5）、Read/Write 慣例與 `pre_read`/`post_read` 記錄（階段 6）、動態注入 `inject_subtask` / `[HARNESS_INJECT:...]`（階段 7）、`--sync-plan` + task_list 規劃欄位寫回藍圖（階段 8）、`--json` 可輸出 `verification/status/operations_executed`（階段 9）；**尚無** 中長期能力（階段 10+）。  
+**現況摘要**：已有 `build_goals.yaml`、`tasks.py`、`build_workflow.py`、`unity_common.py`、`harness/mcp_runner`、`core/pipeline`（schema/store/plan_normalize/bootstrap/runner/execution/tool_adapter）、Coplay MCP；**已具備** Plan Normalize + bootstrap 至 `task_list.yaml`（`run_build` 啟動鏈）；**已具備** 執行期 prompt 以 `task_list` 為準 + Harness 上下文注入（階段 3）、每步 `status` / `operations_executed` 落盤（階段 4）、`get_next_runnable_task` + `--retry-failed` 斷點續跑（階段 5）、Read/Write 慣例與 `pre_read`/`post_read` 記錄（階段 6）、動態注入 `inject_subtask` / `[HARNESS_INJECT:...]`（階段 7）、`--sync-plan` + task_list 規劃欄位寫回藍圖（階段 8）、`--json` 可輸出 `verification/status/operations_executed`（階段 9）；**已具備** CLI 主入口 `unity-mcp-harness`（階段 10.5），其餘 10.x 仍待規劃。  
 **設計要點**：人類撰寫的 `build_goals.yaml` 不必逐條符合 HARNESS 執行契約；無 `task_list.yaml` 或 `--replan` 時會 LLM 規範化（可 3→N）再 bootstrap（見 HARNESS §2.1、階段 1.5）。
 
 **跨套件債務（0.5 已完成）**：`UnityMCPRunner` 已遷入 **unity-mcp-harness**；aicentral-agent 僅保留通用 LangGraph。
@@ -110,7 +110,7 @@
 - [ ] **10.2** `Execute_Undo` / Phase 3 回滾
 - [ ] **10.3** HTTP MCP 長連線
 - [ ] **10.4** 持久 MCP session（aicentral）
-- [ ] **10.5** CLI 更名 `unity-mcp-harness`
+- [x] **10.5** CLI 更名 `unity-mcp-harness`
 
 ### Harness v1 完成定義（全部滿足即 v1）
 

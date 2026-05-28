@@ -14,7 +14,7 @@
 - **[docs/HARNESS.md](docs/HARNESS.md)** — 框架規格（藍圖 vs 執行期、Phase 1–4、Plan Normalize）
 - **[docs/TO_HARNESS.md](docs/TO_HARNESS.md)** — 由現況到 Harness v1 的實作清單（可逐條勾選）
 
-CLI 入口點仍為 `unity-mcp-build` 等（與舊 `unity-mcp` 相容）；套件名為 `unity-mcp-harness`。
+CLI 入口點為 `unity-mcp-harness`（並保留 `unity-mcp-build` 相容別名）；套件名為 `unity-mcp-harness`。
 
 ---
 
@@ -60,14 +60,15 @@ pip install -e .
 ```powershell
 Copy-Item build_goals.example.yaml build_goals.yaml
 # 編輯 tasks 列表
-unity-mcp-build
+unity-mcp-harness
 ```
 
 ### 4. 其他指令
 
 | 指令 | 說明 |
 |------|------|
-| `unity-mcp-build` | 依 `build_goals.yaml` 順序執行任務 |
+| `unity-mcp-harness` | 依 `build_goals.yaml` 順序執行任務（主要入口） |
+| `unity-mcp-build` | 舊版相容別名（等同 `unity-mcp-harness`） |
 | `unity-mcp-chat` | 多輪對話 REPL |
 | `unity-mcp-ask "問題"` | 單次提問 |
 | `unity-mcp-list-tools` | 列出 MCP 工具（不呼叫 LLM） |
