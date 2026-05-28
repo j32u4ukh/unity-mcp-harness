@@ -20,6 +20,7 @@ unity-mcp-chat = "chat:main"
 unity-mcp-ask = "ask:main"
 unity-mcp-list-tools = "list_tools:main"
 unity-mcp-build = "run_build:main"
+unity-mcp-harness = "run_build:main"
 
 [build-system]
 requires = ["setuptools>=61"]
