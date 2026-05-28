@@ -8,7 +8,7 @@ param(
     [string]$ProjectPath = "C:\Users\PC\Documents\UnityProjects\PlanetaryMalignancy"
 )
 
-# 強制設定 PowerShell 階段的所有輸出編碼為 UTF-8 (必須放在 param 之後)
+# Force UTF-8 console output (must be after param block)
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
@@ -48,10 +48,10 @@ if ($existingUnity) {
 
 Write-Host "Launching Unity in Background..." -ForegroundColor Green
 
-# 4. Start Process & Capture Process Object (使用 -PassThru 抓取 PID)
+# 4. Start Process and capture PID (-PassThru)
 $unityProcess = Start-Process -FilePath $UnityExe -ArgumentList $unityArgs -WorkingDirectory $ProjectPath -NoNewWindow -PassThru
 
-# 立即提取 PID
+# Capture PID immediately
 $unityPID = $unityProcess.Id
 Write-Host "Unity process launched successfully with PID: $unityPID" -ForegroundColor Green
 
@@ -59,7 +59,7 @@ Write-Host "Unity process launched successfully with PID: $unityPID" -Foreground
 Write-Host "Waiting 3 seconds for project initialization..." -ForegroundColor Cyan
 Start-Sleep -Seconds 3
 
-# 進階驗證：檢查進程是否還活著（防範專案鎖定導致的瞬間閃退）
+# Runtime validation: ensure process is still alive
 if ($unityProcess.HasExited) {
     Write-Error "Error: Unity process (PID: $unityPID) crashed or exited prematurely! Please check Unity hub or file locks."
 }
