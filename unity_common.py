@@ -12,7 +12,6 @@ ENV_PROJECT_HOME = "UNITY_MCP_HOME"
 ENV_AICENTRAL_HOME = "AICENTRAL_HOME"
 
 from aicentral import Chat, MCPManager, register_mcp_server, register_mcp_servers
-from aicentral.config.loader import repo_root
 from aicentral.config.schema import MCPServerEntry
 from aicentral.exceptions import ProviderError
 from aicentral.mcp import MCPError
@@ -55,18 +54,14 @@ def project_root() -> Path:
 
 def resolve_aicentral_config_dir() -> Path:
     """
-    aicentral 的 ``config/`` 目錄（含 ``secret.yaml``）。
+    LLM / aicentral 設定目錄（``secret.yaml``、``aicentral.yaml``、``rate_limit_store.json``）。
 
-    優先序：``AICENTRAL_HOME/config`` > 執行檔旁 ``config/`` > aicentral 套件 repo 的 ``config/``。
+    優先序：``AICENTRAL_HOME/config`` > ``project_root()/config``（Harness 專案自有設定）。
     """
     env = os.environ.get(ENV_AICENTRAL_HOME, "").strip()
     if env:
         return Path(env).expanduser().resolve() / "config"
-    if _is_frozen():
-        local = project_root() / "config"
-        if (local / "secret.yaml").is_file() or (local / "aicentral.yaml").is_file():
-            return local
-    return repo_root() / "config"
+    return project_root() / "config"
 
 
 def bootstrap_aicentral_config() -> Path:
@@ -92,10 +87,16 @@ def require_aicentral_config() -> Path:
     cfg_dir = resolve_aicentral_config_dir()
     secret = cfg_dir / "secret.yaml"
     if not secret.is_file():
+        example = cfg_dir / "secret.yaml.example"
+        hint = (
+            f"Copy-Item .\\config\\secret.yaml.example .\\config\\secret.yaml"
+            if example.is_file()
+            else "建立 config\\secret.yaml（可從 config\\secret.yaml.example 複製）"
+        )
         print(
             f"找不到 {secret}\n"
-            "請在 aicentral 專案執行：Copy-Item config\\secret.yaml.example config\\secret.yaml\n"
-            f"或設定環境變數 {ENV_AICENTRAL_HOME} 指向 aicentral 專案根目錄。",
+            f"請在 unity-mcp-harness 目錄執行：{hint}\n"
+            f"或設定環境變數 {ENV_AICENTRAL_HOME} 指向含 config/ 的目錄根。",
             file=sys.stderr,
         )
         sys.exit(1)

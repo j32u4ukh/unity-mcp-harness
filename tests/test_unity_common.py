@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from unity_common import (
+    ENV_AICENTRAL_HOME,
     ENV_PROJECT_HOME,
     DEFAULT_LLM_MODEL,
     ask_unity,
@@ -17,6 +18,7 @@ from unity_common import (
     load_server_specs,
     register_unity_servers,
     registered_server_names,
+    resolve_aicentral_config_dir,
     resolve_server_specs,
     project_root,
     resolve_unity_llm_model,
@@ -39,6 +41,21 @@ def test_project_root_frozen_exe_dir(
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(exe))
     assert project_root() == tmp_path.resolve()
+
+
+def test_resolve_aicentral_config_dir_defaults_to_project_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv(ENV_AICENTRAL_HOME, raising=False)
+    monkeypatch.setattr("unity_common.project_root", lambda: tmp_path)
+    assert resolve_aicentral_config_dir() == (tmp_path / "config").resolve()
+
+
+def test_resolve_aicentral_config_dir_env_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(ENV_AICENTRAL_HOME, str(tmp_path))
+    assert resolve_aicentral_config_dir() == (tmp_path / "config").resolve()
 
 
 @patch("unity_common.effective_model", side_effect=lambda m: m)
@@ -137,6 +154,29 @@ def test_resolve_server_specs_from_file(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.delenv("UNITY_MCP_URL", raising=False)
     specs = resolve_server_specs()
     assert "u" in specs
+
+
+def test_bootstrap_uses_harness_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from aicentral.config.loader import config_dir
+    from aicentral.routing.gemini_rate_limit_store import resolve_store_path
+    from unity_common import bootstrap_aicentral_config
+
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    (cfg / "secret.yaml").write_text("gemini:\n  api_key: test\n", encoding="utf-8")
+    (cfg / "aicentral.yaml").write_text(
+        "gemini_pools:\n  default:\n"
+        "    rate_limit_store_path: config/rate_limit_store.json\n"
+        "    models:\n      - model_id: m\n        rpm_limit: 5\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("unity_common.project_root", lambda: tmp_path)
+
+    bootstrap_aicentral_config()
+    assert config_dir() == cfg.resolve()
+    assert resolve_store_path("config/rate_limit_store.json") == (
+        tmp_path / "config" / "rate_limit_store.json"
+    ).resolve()
 
 
 @patch("unity_common.register_mcp_servers")

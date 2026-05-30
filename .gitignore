@@ -222,3 +222,6 @@ __marimo__/
 # Harness 執行期 SSOT（保留 task_list.example.yaml）
 task_list.yaml
 task_list.yaml.tmp
+
+config/secret.yaml
+config/rate_limit_store.json

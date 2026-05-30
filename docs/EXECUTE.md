@@ -1,19 +1,59 @@
 # unity-mcp-harness 實際執行指令（操作順序版）
 
-以下按「實際操作時間線」排列，照順序執行即可。
+以下改成命令提示字元呈現（`PS 目前目錄> 指令`），可直接對照你終端機狀態。
+
+**路徑約定**：起始目錄為 repo 根目錄 `llm-server/`。
+
+```text
+llm-server/
+├── aicentral/
+└── unity-mcp-harness/    ← Harness 工作目錄
+```
 
 ---
 
 ## 1) 一次性安裝（首次才做）
 
 ```powershell
-cd ..\aicentral
-Copy-Item config\secret.yaml.example config\secret.yaml
-# 在 secret.yaml 填入 gemini.api_key
-pip install -e ".[mcp]"
+PS llm-server> cd .\aicentral
+PS aicentral> Copy-Item .\config\secret.yaml.example .\config\secret.yaml
+PS aicentral> # 在 secret.yaml 填入 gemini.api_key
+PS aicentral> pip install -e ".[mcp]"
 
-cd ..\unity-mcp-harness
-pip install -e .
+PS aicentral> cd ..\unity-mcp-harness
+PS unity-mcp-harness> pip install -e .
+```
+
+安裝後確認 CLI 已註冊（應列出 `unity-mcp-harness.exe`）：
+
+```powershell
+PS unity-mcp-harness> python -m pip show unity-mcp-harness
+PS unity-mcp-harness> Get-ChildItem "$(python -c "import sysconfig; print(sysconfig.get_path('scripts'))")" -Filter "unity-mcp*"
+PS unity-mcp-harness> unity-mcp-harness --help
+```
+
+若出現 **`無法辨識 'unity-mcp-harness'`**（`CommandNotFoundException`）：
+
+| 原因 | 處理 |
+|------|------|
+| 尚未 `pip install -e .` | 在 `unity-mcp-harness` 目錄重新安裝 |
+| 安裝過舊、沒有 `unity-mcp-harness` 入口 | 再執行一次 `pip install -e .` |
+| Python `Scripts` 不在 PATH | 依下方方式暫時加入 |
+
+**PATH 未包含 Scripts（Windows 常見）**：
+
+```powershell
+PS unity-mcp-harness> $scripts = python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+PS unity-mcp-harness> $env:Path = "$scripts;$env:Path"
+PS unity-mcp-harness> unity-mcp-harness --help
+```
+
+或不用改 PATH，直接跑 Python 模組：
+
+```powershell
+PS unity-mcp-harness> python .\run_build.py --dry-run
+PS unity-mcp-harness> python .\run_build.py
+PS unity-mcp-harness> python .\list_tools.py --json
 ```
 
 ---
@@ -21,21 +61,21 @@ pip install -e .
 ## 2) 準備專案檔案（每個專案至少做一次）
 
 ```powershell
-cd c:\Users\PC\Documents\llm-server\unity-mcp-harness
-Copy-Item build_goals.example.yaml build_goals.yaml
-# 編輯 build_goals.yaml（你的任務定義）
+PS llm-server> cd .\unity-mcp-harness
+PS unity-mcp-harness> Copy-Item .\build_goals.example.yaml .\build_goals.yaml
+PS unity-mcp-harness> # 編輯 .\build_goals.yaml
 ```
 
-如果你用 stdio relay（預設）：
+stdio relay（預設）：
 
 ```powershell
-Copy-Item unity_servers.stdio.example.json unity_servers.json
+PS unity-mcp-harness> Copy-Item .\unity_servers.stdio.example.json .\unity_servers.json
 ```
 
-如果你用 HTTP MCP：
+HTTP MCP：
 
 ```powershell
-Copy-Item unity_servers.example.json unity_servers.json
+PS unity-mcp-harness> Copy-Item .\unity_servers.example.json .\unity_servers.json
 ```
 
 ---
@@ -49,13 +89,14 @@ Copy-Item unity_servers.example.json unity_servers.json
 ### 3.2 用批次腳本啟動（batch mode）
 
 ```powershell
-.\scripts\start_batch_unity.ps1
+PS llm-server> cd .\unity-mcp-harness
+PS unity-mcp-harness> .\scripts\start_batch_unity.ps1
 ```
 
 指定 Unity 版本或專案路徑：
 
 ```powershell
-.\scripts\start_batch_unity.ps1 -UnityExe "C:\Program Files\Unity\Hub\Editor\6000.4.8f1\Editor\Unity.exe" -ProjectPath "C:\Users\PC\Documents\UnityProjects\PlanetaryMalignancy"
+PS unity-mcp-harness> .\scripts\start_batch_unity.ps1 -UnityExe "C:\Program Files\Unity\Hub\Editor\6000.4.8f1\Editor\Unity.exe" -ProjectPath "C:\Users\PC\Documents\UnityProjects\PlanetaryMalignancy"
 ```
 
 ---
@@ -63,7 +104,9 @@ Copy-Item unity_servers.example.json unity_servers.json
 ## 4) 執行前檢查（確認 MCP 真的可用）
 
 ```powershell
-unity-mcp-list-tools --json
+PS llm-server> cd .\unity-mcp-harness
+PS unity-mcp-harness> unity-mcp-list-tools --json
+PS unity-mcp-harness> # 若 CLI 不在 PATH：python .\list_tools.py --json
 ```
 
 看到工具列表再進下一步。
@@ -75,53 +118,58 @@ unity-mcp-list-tools --json
 ### 5.1 先看計畫（不動 Unity）
 
 ```powershell
-unity-mcp-harness --dry-run
+PS llm-server> cd .\unity-mcp-harness
+PS unity-mcp-harness> unity-mcp-harness --dry-run
+PS unity-mcp-harness> # 若 CLI 不在 PATH：python .\run_build.py --dry-run
 ```
 
 ### 5.2 正式執行
 
 ```powershell
-unity-mcp-harness
+PS unity-mcp-harness> unity-mcp-harness
+PS unity-mcp-harness> # 若 CLI 不在 PATH：python .\run_build.py
 ```
 
 ---
 
 ## 6) 執行中的常用操作
 
+以下皆在 `unity-mcp-harness` 目錄執行（CLI 不可用時，將 `unity-mcp-harness` 換成 `python .\run_build.py`）。
+
 ### 6.1 失敗也繼續後續任務
 
 ```powershell
-unity-mcp-harness --continue-on-error
+PS unity-mcp-harness> unity-mcp-harness --continue-on-error
 ```
 
 ### 6.2 輸出完整 JSON（含 verification）
 
 ```powershell
-unity-mcp-harness --json
+PS unity-mcp-harness> unity-mcp-harness --json
 ```
 
 ### 6.3 中斷後續跑 failed 任務
 
 ```powershell
-unity-mcp-harness --retry-failed
+PS unity-mcp-harness> unity-mcp-harness --retry-failed
 ```
 
 ### 6.4 藍圖改完後同步 task_list
 
 ```powershell
-unity-mcp-harness --sync-plan
+PS unity-mcp-harness> unity-mcp-harness --sync-plan
 ```
 
-若要把目前規劃欄位寫回 `build_goals.yaml`：
+若要把規劃欄位寫回 `build_goals.yaml`：
 
 ```powershell
-unity-mcp-harness --sync-plan --write-back-goals --backup
+PS unity-mcp-harness> unity-mcp-harness --sync-plan --write-back-goals --backup
 ```
 
 ### 6.5 強制重新規劃（重建 task_list）
 
 ```powershell
-unity-mcp-harness --replan
+PS unity-mcp-harness> unity-mcp-harness --replan
 ```
 
 ---
@@ -131,13 +179,14 @@ unity-mcp-harness --replan
 單次提問：
 
 ```powershell
-unity-mcp-ask "請列出目前可用的 Unity MCP 工具並說明可建立哪些場景物件"
+PS llm-server> cd .\unity-mcp-harness
+PS unity-mcp-harness> unity-mcp-ask "請列出目前可用的 Unity MCP 工具並說明可建立哪些場景物件"
 ```
 
 互動模式：
 
 ```powershell
-unity-mcp-chat
+PS unity-mcp-harness> unity-mcp-chat
 ```
 
 ---
@@ -145,7 +194,8 @@ unity-mcp-chat
 ## 8) 結束後關閉 Unity（若你使用 batch 腳本啟動）
 
 ```powershell
-.\scripts\finish_batch_unity.ps1
+PS llm-server> cd .\unity-mcp-harness
+PS unity-mcp-harness> .\scripts\finish_batch_unity.ps1
 ```
 
 ---
@@ -155,28 +205,29 @@ unity-mcp-chat
 安裝 PyInstaller 並打包：
 
 ```powershell
-pip install pyinstaller
-.\scripts\build_exe.ps1
+PS llm-server> cd .\unity-mcp-harness
+PS unity-mcp-harness> pip install pyinstaller
+PS unity-mcp-harness> .\scripts\build_exe.ps1
 ```
 
-產物位置：
+產物位置（相對 Harness 目錄）：
 
 ```text
-dist\unity-mcp-build\unity-mcp-build.exe
+.\dist\unity-mcp-build\unity-mcp-build.exe
 ```
 
 將下列檔案放到 exe 同層後執行：
 
-- `build_goals.yaml`
-- `unity_servers.json`
-- `config\secret.yaml`（可選再放 `config\aicentral.yaml`）
+- `.\build_goals.yaml`
+- `.\unity_servers.json`
+- `.\config\secret.yaml`（可選再放 `.\config\aicentral.yaml`）
 
 執行方式：
 
 ```powershell
-cd .\dist\unity-mcp-build
-.\unity-mcp-build.exe --dry-run
-.\unity-mcp-build.exe
+PS unity-mcp-harness> cd .\dist\unity-mcp-build
+PS unity-mcp-build> .\unity-mcp-build.exe --dry-run
+PS unity-mcp-build> .\unity-mcp-build.exe
 ```
 
 ---
