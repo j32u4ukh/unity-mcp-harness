@@ -69,8 +69,8 @@ unity-mcp-harness
 |------|------|
 | `unity-mcp-harness` | 依 `build_goals.yaml` 順序執行任務（主要入口） |
 | `unity-mcp-build` | 舊版相容別名（等同 `unity-mcp-harness`） |
-| `unity-mcp-chat` | 多輪對話 REPL |
-| `unity-mcp-ask "問題"` | 單次提問 |
+| `unity-mcp-chat` | **Unity 專案探索**（多輪 REPL；連線 MCP 查詢場景／資產現況） |
+| `unity-mcp-ask "問題"` | **Unity 專案探索**（單次；`--probe` 使用預設唯讀探查 prompt） |
 | `unity-mcp-list-tools` | 列出 MCP 工具（不呼叫 LLM） |
 
 ---
@@ -85,7 +85,9 @@ unity-mcp-harness
 | `build_workflow.py` | LangGraph 依序執行任務 |
 | `tasks.py` | 載入 YAML、組 prompt |
 | `unity_common.py` | 註冊 MCP、`Chat.with_mcp` |
-| `chat.py` / `ask.py` / `list_tools.py` | 互動與除錯 CLI |
+| `unity_explore.py` | 探索 system prompt、MCP 驗證、啟動探查 |
+| `config/unity_explore.yaml` | 探索行為設定（prompt、tool 輪數） |
+| `unity_mcp_chat.py` / `unity_mcp_ask.py` / `unity_mcp_list_tools.py` | 互動與除錯 CLI |
 
 ### 打包成 exe（可選）
 

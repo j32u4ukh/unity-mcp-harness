@@ -53,7 +53,7 @@ PS unity-mcp-harness> unity-mcp-harness --help
 ```powershell
 PS unity-mcp-harness> python .\run_build.py --dry-run
 PS unity-mcp-harness> python .\run_build.py
-PS unity-mcp-harness> python .\list_tools.py --json
+PS unity-mcp-harness> python .\unity_mcp_list_tools.py --json
 ```
 
 ---
@@ -174,24 +174,47 @@ PS unity-mcp-harness> unity-mcp-harness --replan
 
 ---
 
-## 7) 快速除錯
+## 7) Unity 專案探索（非純 LLM 聊天）
 
-單次提問：
+與 `aicentral-chat` 不同，`unity-mcp-chat` / `unity-mcp-ask` **必須連線 Unity MCP**，並以工具查詢 Editor 內真實現況後再回答。行為可由 `config/unity_explore.yaml` 調整。
+
+前置：Unity Editor 已開啟，且 `unity-mcp-list-tools --json` 可列出工具。
+
+單次探索：
 
 ```powershell
 PS llm-server> cd .\unity-mcp-harness
-PS unity-mcp-harness> unity-mcp-ask "請列出目前可用的 Unity MCP 工具並說明可建立哪些場景物件"
+PS unity-mcp-harness> unity-mcp-ask "Example2DScene 場景中的 Sprite 資產叫什麼？"
+PS unity-mcp-harness> unity-mcp-ask --probe
 ```
 
-互動模式：
+多輪探索（啟動時預設做一次唯讀現況探查；REPL 支援 `/tools`、`/status`、`/help`）：
 
 ```powershell
 PS unity-mcp-harness> unity-mcp-chat
+PS unity-mcp-harness> unity-mcp-chat --no-probe
+```
+
+LLM 設定預設讀取本專案 `config/aicentral.yaml` 與 `config/secret.yaml`（**不是** `aicentral/config/`）。
+可用 `--aicentral-config`、`--secret` 覆寫；Unity MCP 連線用 `-c` / `--unity-config`（`unity_servers.json`）。
+
+```powershell
+PS unity-mcp-harness> unity-mcp-ask "Example2DScene 的 Sprite 叫什麼？" --secret .\config\secret.yaml
 ```
 
 ---
 
-## 8) 結束後關閉 Unity（若你使用 batch 腳本啟動）
+## 8) 快速除錯（建構流程）
+
+若僅需確認 MCP 連線：
+
+```powershell
+PS unity-mcp-harness> unity-mcp-list-tools --json
+```
+
+---
+
+## 9) 結束後關閉 Unity（若你使用 batch 腳本啟動）
 
 ```powershell
 PS llm-server> cd .\unity-mcp-harness
@@ -200,7 +223,7 @@ PS unity-mcp-harness> .\scripts\finish_batch_unity.ps1
 
 ---
 
-## 9) 打包成執行檔（可選，通常在流程穩定後）
+## 10) 打包成執行檔（可選，通常在流程穩定後）
 
 安裝 PyInstaller 並打包：
 
@@ -220,7 +243,7 @@ PS unity-mcp-harness> .\scripts\build_exe.ps1
 
 - `.\build_goals.yaml`
 - `.\unity_servers.json`
-- `.\config\secret.yaml`（可選再放 `.\config\aicentral.yaml`）
+- `.\config\secret.yaml`（可選再放 `.\config\aicentral.yaml`、`.\config\unity_explore.yaml`）
 
 執行方式：
 
@@ -232,6 +255,6 @@ PS unity-mcp-build> .\unity-mcp-build.exe
 
 ---
 
-## 10) 相容別名
+## 11) 相容別名
 
 `unity-mcp-build` 與 `unity-mcp-harness` 等價，可替換使用。

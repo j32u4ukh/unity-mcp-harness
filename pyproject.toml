@@ -16,9 +16,10 @@ dev = [
 ]
 
 [project.scripts]
-unity-mcp-chat = "chat:main"
-unity-mcp-ask = "ask:main"
-unity-mcp-list-tools = "list_tools:main"
+# 入口使用唯一模組名（避免與 aicentral-chat 的 chat:main 衝突）
+unity-mcp-chat = "unity_mcp_chat:main"
+unity-mcp-ask = "unity_mcp_ask:main"
+unity-mcp-list-tools = "unity_mcp_list_tools:main"
 unity-mcp-build = "run_build:main"
 unity-mcp-harness = "run_build:main"
 
@@ -29,12 +30,13 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 py-modules = [
     "unity_common",
+    "unity_explore",
+    "unity_mcp_chat",
+    "unity_mcp_ask",
+    "unity_mcp_list_tools",
     "tasks",
     "build_workflow",
     "run_build",
-    "chat",
-    "ask",
-    "list_tools",
 ]
 
 [tool.setuptools.packages.find]

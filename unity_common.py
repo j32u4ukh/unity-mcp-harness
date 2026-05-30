@@ -64,43 +64,79 @@ def resolve_aicentral_config_dir() -> Path:
     return project_root() / "config"
 
 
-def bootstrap_aicentral_config() -> Path:
-    """依 ``resolve_aicentral_config_dir()`` 載入 aicentral 設定（支援 exe 旁 config/）。"""
+def resolve_harness_llm_config_paths(
+    *,
+    aicentral_config: Path | str | None = None,
+    secret: Path | str | None = None,
+) -> tuple[Path, Path]:
+    """
+    解析 LLM 設定路徑（預設 ``project_root()/config/`` 或 ``AICENTRAL_HOME/config/``）。
+
+    回傳 ``(aicentral.yaml, secret.yaml)`` 絕對路徑。
+    """
+    cfg_dir = resolve_aicentral_config_dir()
+    main = (
+        Path(aicentral_config).expanduser().resolve()
+        if aicentral_config
+        else (cfg_dir / "aicentral.yaml").resolve()
+    )
+    secret_p = (
+        Path(secret).expanduser().resolve()
+        if secret
+        else (cfg_dir / "secret.yaml").resolve()
+    )
+    return main, secret_p
+
+
+def bootstrap_aicentral_config(
+    *,
+    aicentral_config: Path | str | None = None,
+    secret: Path | str | None = None,
+) -> Path:
+    """依 harness 設定目錄或明確路徑載入 aicentral（``reload=True``）。"""
     from aicentral.config.loader import load_config
 
-    cfg_dir = resolve_aicentral_config_dir()
-    main = cfg_dir / "aicentral.yaml"
-    secret = cfg_dir / "secret.yaml"
-    if not secret.is_file() and not main.is_file():
-        return cfg_dir
+    main, secret_p = resolve_harness_llm_config_paths(
+        aicentral_config=aicentral_config,
+        secret=secret,
+    )
+    if not secret_p.is_file() and not main.is_file():
+        return main.parent
     load_config(
         path=main,
-        secrets_path=secret if secret.is_file() else None,
+        secrets_path=secret_p if secret_p.is_file() else None,
         reload=True,
     )
-    return cfg_dir
+    return main.parent
 
 
-def require_aicentral_config() -> Path:
-    """確認 aicentral 的 config/secret.yaml 存在（LLM 用，不含 Unity MCP）。"""
-    bootstrap_aicentral_config()
-    cfg_dir = resolve_aicentral_config_dir()
-    secret = cfg_dir / "secret.yaml"
-    if not secret.is_file():
-        example = cfg_dir / "secret.yaml.example"
+def require_aicentral_config(
+    *,
+    aicentral_config: Path | str | None = None,
+    secret: Path | str | None = None,
+) -> Path:
+    """確認 secret.yaml 存在並載入 harness LLM 設定（非 aicentral repo 預設路徑）。"""
+    bootstrap_aicentral_config(aicentral_config=aicentral_config, secret=secret)
+    main, secret_p = resolve_harness_llm_config_paths(
+        aicentral_config=aicentral_config,
+        secret=secret,
+    )
+    if not secret_p.is_file():
+        example = main.parent / "secret.yaml.example"
         hint = (
             f"Copy-Item .\\config\\secret.yaml.example .\\config\\secret.yaml"
             if example.is_file()
             else "建立 config\\secret.yaml（可從 config\\secret.yaml.example 複製）"
         )
         print(
-            f"找不到 {secret}\n"
+            f"找不到 {secret_p}\n"
             f"請在 unity-mcp-harness 目錄執行：{hint}\n"
-            f"或設定環境變數 {ENV_AICENTRAL_HOME} 指向含 config/ 的目錄根。",
+            f"或設定環境變數 {ENV_AICENTRAL_HOME} 指向含 config/ 的目錄根，"
+            f"或使用 --secret 指定路徑。",
             file=sys.stderr,
         )
         sys.exit(1)
-    return cfg_dir
+    return main.parent
 
 
 def resolve_unity_llm_model(model: str | None = None) -> str:
@@ -304,6 +340,7 @@ def create_unity_chat(
     mcp_servers: list[str] | str,
     *,
     model: str | None = None,
+    system: str | None = None,
     max_tool_rounds: int = 8,
     include_tool_messages_in_history: bool = True,
     specs: dict[str, dict[str, Any]] | None = None,
@@ -317,8 +354,11 @@ def create_unity_chat(
     runner = create_unity_mcp_runner(
         mcp_servers,
         model=resolve_unity_llm_model(model),
+        system=system,
         max_tool_rounds=max_tool_rounds,
         include_tool_messages_in_history=include_tool_messages_in_history,
+        specs=resolved,
+        config_path=config_path,
     )
     return runner.chat
 
@@ -328,6 +368,7 @@ def ask_unity(
     *,
     mcp_servers: list[str] | str | None = None,
     model: str | None = None,
+    system: str | None = None,
     chat: Chat | None = None,
     max_tool_rounds: int = 8,
     specs: dict[str, dict[str, Any]] | None = None,
@@ -340,6 +381,7 @@ def ask_unity(
     session = chat or create_unity_chat(
         mcp_servers,
         model=model,
+        system=system,
         max_tool_rounds=max_tool_rounds,
         specs=specs,
         config_path=config_path,
@@ -358,6 +400,50 @@ def list_unity_tools(
     return {name: mgr.list_tools(name) for name in registered_server_names(specs)}
 
 
+def add_harness_llm_config_args(parser: Any) -> None:
+    """CLI：``--aicentral-config`` / ``--secret``（預設 harness ``config/``）。"""
+    cfg_dir = resolve_aicentral_config_dir()
+    parser.add_argument(
+        "--aicentral-config",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help=f"LLM 主設定 aicentral.yaml（預設 {cfg_dir / 'aicentral.yaml'}）",
+    )
+    parser.add_argument(
+        "--secret",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help=f"API 金鑰 secret.yaml（預設 {cfg_dir / 'secret.yaml'}）",
+    )
+
+
+def add_unity_mcp_config_arg(parser: Any) -> None:
+    """CLI：``-c`` / ``--unity-config``（Unity MCP JSON，非 LLM secret）。"""
+    parser.add_argument(
+        "-c",
+        "--unity-config",
+        dest="unity_config",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Unity MCP 設定 JSON（預設 unity_servers.json；無檔時 fallback HTTP :8080）",
+    )
+
+
+def format_llm_config_paths(
+    *,
+    aicentral_config: Path | str | None = None,
+    secret: Path | str | None = None,
+) -> str:
+    main, secret_p = resolve_harness_llm_config_paths(
+        aicentral_config=aicentral_config,
+        secret=secret,
+    )
+    return f"LLM 設定: {main}\nSecret: {secret_p}"
+
+
 def print_banner(
     *,
     title: str,
@@ -366,9 +452,12 @@ def print_banner(
     detail: str = "",
     specs: dict[str, dict[str, Any]] | None = None,
     interactive: bool = False,
+    aicentral_config: Path | str | None = None,
+    secret: Path | str | None = None,
 ) -> None:
     print(f"unity-mcp — {title}")
     print(f"模型: {model}")
+    print(format_llm_config_paths(aicentral_config=aicentral_config, secret=secret))
     print(f"Unity MCP servers: {', '.join(server_names)}")
     if detail:
         print(detail)

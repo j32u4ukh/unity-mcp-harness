@@ -226,9 +226,9 @@ unity-mcp-build -g my_plan.yaml -c unity_servers.json
 | 指令 / 腳本 | 用途 |
 |-------------|------|
 | `unity-mcp-build` | `run_build.py` — 依任務清單順序建構 |
-| `unity-mcp-chat` | `chat.py` — 多輪互動 REPL |
-| `unity-mcp-ask` | `ask.py` — 單次提問 |
-| `unity-mcp-list-tools` | `list_tools.py` — 只列 MCP 工具，不呼叫 LLM |
+| `unity-mcp-chat` | `unity_mcp_chat.py` — 多輪互動 REPL |
+| `unity-mcp-ask` | `unity_mcp_ask.py` — 單次提問 |
+| `unity-mcp-list-tools` | `unity_mcp_list_tools.py` — 只列 MCP 工具，不呼叫 LLM |
 
 ### unity-mcp-chat / unity-mcp-ask
 

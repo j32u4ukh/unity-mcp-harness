@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from aicentral import Chat
-from aicentral.routing.router import effective_model
 
 
 class UnityMCPRunner:
@@ -29,20 +28,20 @@ def create_unity_mcp_runner(
     mcp_servers: list[str] | str,
     *,
     model: str | None = None,
+    system: str | None = None,
     max_tool_rounds: int = 8,
     include_tool_messages_in_history: bool = True,
     specs: dict[str, dict[str, Any]] | None = None,
     config_path: Path | str | None = None,
 ) -> UnityMCPRunner:
-    """建立 runner；MCP 註冊委派 ``unity_common.register_unity_servers``。"""
-    if specs is not None:
-        from unity_common import register_unity_servers
+    """建立 runner；呼叫前須已由 ``register_unity_servers`` 註冊 MCP。"""
+    from unity_common import resolve_unity_llm_model
 
-        register_unity_servers(specs, config_path=config_path)
     servers = mcp_servers if isinstance(mcp_servers, list) else [mcp_servers]
     chat = Chat.with_mcp(
         servers,
-        model=model or effective_model(None),
+        model=resolve_unity_llm_model(model),
+        system=system,
         max_tool_rounds=max_tool_rounds,
         include_tool_messages_in_history=include_tool_messages_in_history,
     )

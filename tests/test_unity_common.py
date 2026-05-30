@@ -12,6 +12,7 @@ from unity_common import (
     ENV_PROJECT_HOME,
     DEFAULT_LLM_MODEL,
     ask_unity,
+    bootstrap_aicentral_config,
     create_unity_chat,
     default_server_spec,
     format_mcp_prerequisites,
@@ -19,6 +20,7 @@ from unity_common import (
     register_unity_servers,
     registered_server_names,
     resolve_aicentral_config_dir,
+    resolve_harness_llm_config_paths,
     resolve_server_specs,
     project_root,
     resolve_unity_llm_model,
@@ -154,6 +156,33 @@ def test_resolve_server_specs_from_file(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.delenv("UNITY_MCP_URL", raising=False)
     specs = resolve_server_specs()
     assert "u" in specs
+
+
+def test_resolve_harness_llm_config_paths_explicit(tmp_path: Path) -> None:
+    main = tmp_path / "custom" / "aicentral.yaml"
+    secret = tmp_path / "keys" / "secret.yaml"
+    main.parent.mkdir(parents=True)
+    secret.parent.mkdir(parents=True)
+    resolved_main, resolved_secret = resolve_harness_llm_config_paths(
+        aicentral_config=main,
+        secret=secret,
+    )
+    assert resolved_main == main.resolve()
+    assert resolved_secret == secret.resolve()
+
+
+def test_bootstrap_explicit_secret_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from aicentral.config.loader import config_dir, get_secret
+
+    secret = tmp_path / "my_secret.yaml"
+    secret.write_text("gemini:\n  api_key: from-explicit\n", encoding="utf-8")
+    main = tmp_path / "config" / "aicentral.yaml"
+    main.parent.mkdir(parents=True)
+    main.write_text("defaults:\n  model: gemini-flash\n", encoding="utf-8")
+
+    bootstrap_aicentral_config(aicentral_config=main, secret=secret)
+    assert config_dir() == main.parent.resolve()
+    assert get_secret("gemini.api_key") == "from-explicit"
 
 
 def test_bootstrap_uses_harness_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
