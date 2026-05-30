@@ -91,6 +91,17 @@ def parse_args() -> argparse.Namespace:
         help="將 failed 任務納入本輪可執行清單（預設僅 pending/in_progress）",
     )
     parser.add_argument(
+        "--plan-interactive",
+        action="store_true",
+        help="Plan Normalize 時對 JSON 未涵蓋的模糊項終端詢問，並可寫回 config/prompt_supplements.json",
+    )
+    parser.add_argument(
+        "--supplements",
+        type=str,
+        default=None,
+        help="規劃補充 prompt JSON（預設 config/prompt_supplements.json）",
+    )
+    parser.add_argument(
         "--sync-plan",
         action="store_true",
         help="以最新 build_goals 規範化並同步合併至 task_list（保留 completed 紀錄）",
@@ -174,6 +185,8 @@ def main() -> None:
             write_back_goals=args.write_back_goals and not args.sync_plan,
             backup_goals=args.backup,
             plan_with_mcp=args.plan_with_mcp,
+            plan_interactive=args.plan_interactive,
+            supplements_path=args.supplements,
             unity_config_path=args.unity_config,
             specs=specs,
         )

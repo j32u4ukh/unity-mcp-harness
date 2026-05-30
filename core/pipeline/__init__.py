@@ -12,7 +12,12 @@ from core.pipeline.goals_writeback import write_back_build_goals, write_back_tas
 from core.pipeline.plan_normalize import (
     normalize_plan,
     normalize_plan_passthrough,
+    normalize_plan_passthrough_enriched,
     parse_normalize_response,
+)
+from core.pipeline.prompt_supplements import (
+    apply_prompt_supplements,
+    load_prompt_supplements,
 )
 from core.pipeline.context import format_harness_task_context, format_pipeline_records_summary
 from core.pipeline.execution import (
@@ -47,7 +52,10 @@ __all__ = [
     "ensure_task_list",
     "normalize_plan",
     "normalize_plan_passthrough",
+    "normalize_plan_passthrough_enriched",
     "parse_normalize_response",
+    "apply_prompt_supplements",
+    "load_prompt_supplements",
     "plan_pre_read",
     "plan_post_read",
     "prepare_harness_queue",

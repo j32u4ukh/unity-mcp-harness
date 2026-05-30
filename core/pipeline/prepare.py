@@ -8,7 +8,7 @@ from typing import Any
 
 from core.pipeline.bootstrap import ensure_task_list
 from core.pipeline.goals_writeback import write_back_build_goals
-from core.pipeline.plan_normalize import normalize_plan, normalize_plan_passthrough
+from core.pipeline.plan_normalize import normalize_plan, normalize_plan_passthrough_enriched
 from core.pipeline.schema import NormalizedPlan, NormalizedTask, TaskListDocument
 from core.pipeline.store import default_task_list_path
 from tasks import BuildPlan, resolve_build_plan
@@ -56,6 +56,8 @@ def prepare_harness_queue(
     write_back_goals: bool = False,
     backup_goals: bool = False,
     plan_with_mcp: bool = False,
+    plan_interactive: bool = False,
+    supplements_path: Path | str | None = None,
     unity_config_path: str | None = None,
     specs: dict[str, dict[str, Any]] | None = None,
 ) -> HarnessPrepareResult:
@@ -72,7 +74,11 @@ def prepare_harness_queue(
 
     if need_bootstrap:
         if skip_plan_normalize:
-            normalized = normalize_plan_passthrough(build_plan)
+            normalized = normalize_plan_passthrough_enriched(
+                build_plan,
+                plan_interactive=plan_interactive,
+                supplements_path=supplements_path,
+            )
         else:
             existing_revision = 1
             if had_task_list and replan:
@@ -83,6 +89,8 @@ def prepare_harness_queue(
                 build_plan,
                 plan_revision=existing_revision,
                 plan_with_mcp=plan_with_mcp,
+                plan_interactive=plan_interactive,
+                supplements_path=supplements_path,
                 specs=specs,
                 unity_config_path=unity_config_path,
             )
