@@ -93,9 +93,20 @@ README 曾把 Cursor 的 `mcpServers` 範例寫成「複製到 unity_servers.jso
 
 **處理**：`unity-mcp-build --json` 看完整 `reply`；或加大 prompt 要求「必須引用工具回傳」。
 
-### 8. 沒有「部分達標」狀態
+### 8. 任務 `verification: verified` 的意義（v1.1+）
 
-workflow 每任務只有 **OK / FAIL**（+ 啟發式文字判斷），**不會**程式化讀 Hierarchy 回報「有場景但缺燈光」。要分級驗收需另做工具查詢或專用驗證任務（如 `validate_scene`）。
+預設在 Agent 回合結束後，Harness 會再跑**獨立 MCP 唯讀驗證回合**（`core/pipeline/verification.py`），要求驗證器輸出 JSON（`verified` + `checks`），並寫入 `pipeline_records.actual_after.harness_verification`。
+
+- **`verified`**：驗證 JSON 通過，且無 `Connection revoked` 等失敗訊號。
+- **`failed`**：Agent 文字看似成功，但驗證未通過 → `status` 亦為 `failed`。
+- **`skipped_by_idempotent`**：Agent 宣稱跳過，且驗證確認目標已存在。
+- 除錯可暫時關閉：`unity-mcp-harness --skip-verification`，或任務 `expected.skip_harness_verification: true`。
+
+仍非 Unity C# 斷言；最終依驗證 LLM 是否正確使用 MCP。要更硬可再加專用 `validate_scene` 任務。
+
+### 9. 沒有「部分達標」狀態
+
+workflow 每任務只有 **OK / FAIL**（+ 驗證結果），**不會**自動分級「有場景但缺燈光」。要分級驗收需另做工具查詢或專用驗證任務（如 `validate_scene`）。
 
 ---
 
@@ -103,7 +114,7 @@ workflow 每任務只有 **OK / FAIL**（+ 啟發式文字判斷），**不會**
 
 1. **連線**：`unity-mcp-list-tools --json` 成功再 build。
 2. **模型**：MCP 建構用支援 **function calling** 的模型（必要時 `model: cloud-chat`）。
-3. **核准**：Unity MCP 設定頁面先處理好，避免整輪 build 都在 revoked 上浪費 token。
+3. **核准**：Unity MCP 設定頁面先處理好；每任務預設多一輪驗證 MCP，batch 模式可開 Batch Mode Auto-Approve。
 4. **任務**：`build_goals.yaml` 一步一事；路徑固定 `Assets/_Scenes/`；最後 `validate_scene` 對照 `definition_of_done`。
 5. **除錯**：失敗時 `--json`；單步 `unity-mcp-ask` 鎖定是 MCP 還是 LLM。
 6. **Cursor**：`mcp.json` 與 `unity_servers.json` 分開維護；格式見 `docs/cursor-mcp.http.example.json`（HTTP）或 `unity_servers.stdio.example.json`（relay）。

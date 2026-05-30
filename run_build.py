@@ -137,6 +137,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="自訂基線盤點 prompt（預設 unity_explore.yaml probe_prompt 或內建範本）",
     )
+    parser.add_argument(
+        "--skip-verification",
+        action="store_true",
+        help="略過任務結束後的 MCP 事後驗證（除錯用；預設每任務獨立驗證 Editor 現場）",
+    )
     add_harness_llm_config_args(parser)
     return parser.parse_args()
 
@@ -314,6 +319,7 @@ def main() -> None:
             task_list=task_list,
             task_list_path=task_list_path,
             resume=resume,
+            skip_verification=args.skip_verification,
         )
     except Exception as exc:
         handle_errors(exc)

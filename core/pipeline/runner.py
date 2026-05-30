@@ -6,16 +6,24 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from harness.mcp_runner import UnityMCPRunner
 
 from core.pipeline.schema import HarnessTask, OperationRecord, TaskListDocument
 from core.pipeline.store import inject_subtask, save_task_list
 from core.pipeline.tool_adapter import (
+    DEFAULT_VERIFY_TOOL,
     DEFAULT_WRITE_TOOL,
     append_operation,
     capture_post_read_snapshot,
     capture_pre_read_snapshot,
+    plan_post_read,
+)
+from core.pipeline.verification import (
+    VerificationResult,
+    run_task_verification,
+    should_skip_verification,
 )
 from core.project_state.update import record_task_completion
 from tasks import TaskResult
@@ -48,12 +56,29 @@ def reply_indicates_idempotent_skip(reply: str) -> bool:
     return any(marker.lower() in text for marker in IDEMPOTENT_SKIP_MARKERS)
 
 
-def classify_task_outcome(result: TaskResult) -> tuple[str, str]:
-    """回傳 (status, verification)。"""
+def classify_task_outcome(
+    result: TaskResult,
+    *,
+    verification: VerificationResult | None = None,
+    skip_verification: bool = False,
+) -> tuple[str, str]:
+    """回傳 (status, verification)。``verified`` 僅在 MCP 事後驗證通過時設定。"""
     if not result.success:
         return "failed", "failed"
-    if reply_indicates_idempotent_skip(result.reply):
+
+    idempotent = reply_indicates_idempotent_skip(result.reply)
+
+    if skip_verification or verification is None:
+        if idempotent:
+            return "completed", "skipped_by_idempotent"
+        return "completed", "verified"
+
+    if not verification.passed:
+        return "failed", "failed"
+
+    if idempotent:
         return "completed", "skipped_by_idempotent"
+
     return "completed", "verified"
 
 
@@ -90,10 +115,26 @@ class HarnessTaskRunner:
         path: Path | str,
         *,
         unity_runner: UnityMCPRunner | None = None,
+        model: str | None = None,
+        mcp_servers: list[str] | None = None,
+        unity_config_path: str | Path | None = None,
+        skip_verification: bool = False,
+        definition_of_done: list[str] | None = None,
+        verification_max_tool_rounds: int = 6,
+        specs: dict[str, Any] | None = None,
     ) -> None:
         self.document = document
         self.path = Path(path)
         self.unity_runner = unity_runner
+        self.model = model
+        self.mcp_servers = list(mcp_servers or ["unity"])
+        self.unity_config_path = (
+            str(unity_config_path) if unity_config_path is not None else None
+        )
+        self.skip_verification = skip_verification
+        self.definition_of_done = definition_of_done
+        self.verification_max_tool_rounds = verification_max_tool_rounds
+        self.specs = specs
 
     def get_task(self, task_id: str) -> HarnessTask:
         return find_harness_task(self.document, task_id)
@@ -113,11 +154,28 @@ class HarnessTaskRunner:
         self._persist()
         return task
 
+    def _run_post_task_verification(
+        self, task: HarnessTask, result: TaskResult
+    ) -> VerificationResult | None:
+        if should_skip_verification(task, skip_verification=self.skip_verification):
+            return None
+        if not result.success or not (result.reply or "").strip():
+            return None
+
+        return run_task_verification(
+            task,
+            agent_reply=result.reply,
+            model=self.model,
+            mcp_servers=self.mcp_servers,
+            max_tool_rounds=self.verification_max_tool_rounds,
+            specs=self.specs,
+            config_path=self.unity_config_path,
+            definition_of_done=self.definition_of_done,
+            idempotent_skip=reply_indicates_idempotent_skip(result.reply),
+        )
+
     def on_task_end(self, task_id: str, result: TaskResult) -> HarnessTask:
         task = self.get_task(task_id)
-        status, verification = classify_task_outcome(result)
-        task.status = status
-        task.verification = verification
 
         summary = _summarize_reply(result)
         if summary:
@@ -127,7 +185,41 @@ class HarnessTaskRunner:
                 tool=DEFAULT_WRITE_TOOL,
                 summary=summary,
             )
-        capture_post_read_snapshot(task)
+
+        verification: VerificationResult | None = None
+        if result.success and not should_skip_verification(
+            task, skip_verification=self.skip_verification
+        ):
+            verification = self._run_post_task_verification(task, result)
+            if verification is not None and not verification.passed:
+                result = TaskResult(
+                    id=result.id,
+                    title=result.title,
+                    success=False,
+                    reply=result.reply,
+                    error=verification.summary,
+                )
+
+        status, verification_label = classify_task_outcome(
+            result,
+            verification=verification,
+            skip_verification=self.skip_verification,
+        )
+        task.status = status
+        task.verification = verification_label
+
+        if verification is not None:
+            post_plan = plan_post_read(task)
+            task.pipeline_records.actual_after.setdefault("verify_plan", post_plan.summary)
+            task.pipeline_records.actual_after.update(verification.to_actual_after())
+            append_operation(
+                task,
+                action="MCP_VerifyRead",
+                tool=DEFAULT_VERIFY_TOOL,
+                summary=verification.summary[:2000],
+            )
+        else:
+            capture_post_read_snapshot(task)
 
         if result.success and result.reply and not task_reply_indicates_failure(result.reply):
             task.pipeline_records.actual_after.setdefault(

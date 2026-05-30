@@ -177,6 +177,7 @@ def build_sequential_workflow(
     task_list: TaskListDocument | None = None,
     task_list_path: str | Path | None = None,
     resume: bool = False,
+    skip_verification: bool = False,
 ) -> Any:
     """編譯 LangGraph：依 plan / task_list 順序執行任務。"""
     register_unity_servers(specs, config_path=unity_config_path)
@@ -196,6 +197,12 @@ def build_sequential_workflow(
             task_list,
             list_path,
             unity_runner=runner,
+            model=plan.model,
+            mcp_servers=mcp_servers,
+            unity_config_path=unity_config_path,
+            skip_verification=skip_verification,
+            definition_of_done=plan.definition_of_done,
+            specs=specs,
         )
 
     graph = StateGraph(BuildState)
@@ -225,6 +232,7 @@ def run_build_plan(
     task_list: TaskListDocument | None = None,
     task_list_path: str | Path | None = None,
     resume: bool = False,
+    skip_verification: bool = False,
 ) -> list[TaskResult]:
     """執行整份建構計畫並回傳各任務結果。
 
@@ -238,6 +246,7 @@ def run_build_plan(
         task_list=task_list,
         task_list_path=task_list_path,
         resume=resume,
+        skip_verification=skip_verification,
     )
     harness_by_id = harness_tasks_by_id(task_list) if task_list else {}
     initial: BuildState = {
