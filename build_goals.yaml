@@ -21,9 +21,15 @@ goal: |
   - 資料夾：Assets/_Scenes/
   - 場景檔：Assets/_Scenes/Example2DScene.unity
 
+  Sprite 資產路徑（固定，勿使用 UI/Skin 內建圖或近似匹配）：
+  - 資料夾：Assets/_Generated/
+  - 預期 Sprite 資產：Assets/_Generated/RedSquare2D.png
+  - 幾何：32×32 像素、填滿的方形（矩形）；建立時像素可為白色，顏色由後續任務改為純紅
+
   最終結果必須符合：
   - Scene 可正常開啟
   - Game View (2D) 可直接看到位於中央的紅色 2D 矩形 (Sprite)
+  - RedSquare2D 的 Sprite 來自 Assets/_Generated/RedSquare2D.png（非 Background.psd 等內建 UI 圖）
   - 所有 2D 必要元件已正確建立，無 3D 混用組件
   - 專案可被其他 2D 遊戲開發者立即理解與繼續使用
 
@@ -38,7 +44,9 @@ definition_of_done:
   - Scene 中存在 2D 光源（如 Global Light 2D），以確保 2D 物件可見
   - Scene 中存在名為 "RedSquare2D" 的 GameObject
   - RedSquare2D 必須擁有 SpriteRenderer 組件（禁止使用 MeshRenderer 或 MeshFilter）
-  - RedSquare2D 的 SpriteRenderer 顏色 (Color) 屬性成功被修改為純紅色 (RGB: 1, 0, 0, 1)
+  - RedSquare2D 的 SpriteRenderer.sprite 指向 Assets/_Generated/RedSquare2D.png（或同路徑匯入的 Sprite 子資產），禁止 UI/Skin/Background.psd 等內建或無關圖集
+  - 上述 Sprite 為 32×32 方形幾何（rect 寬高均為 32，或等效填滿方形像素）
+  - RedSquare2D 的 SpriteRenderer 顏色 (Color) 為純紅色 (RGB: 1, 0, 0, 1)
   - RedSquare2D 位於 Camera 的正交可視範圍內
   - 所有 GameObject 狀態為 Active
   - Scene 無 Missing Reference
@@ -59,9 +67,15 @@ system_context: |
   - 變更顏色時，絕對禁止呼叫 `MeshRenderer.sharedMaterial.color`。你必須取得 "SpriteRenderer" 組件，並直接修改其 ".color" 屬性。
   - 2D 場景使用 2D 光源（來自 UnityEngine.Rendering.Universal 命名空間的 Light2D）。絕對禁止建立 3D 的 Directional Light。
 
+  Sprite 資產規則（與 config/prompt_supplements.json 一致）：
+  - 先讀取 SpriteRenderer.sprite 的資產路徑與 rect，再決定是否跳過或修正。
+  - 禁止在專案搜尋「看起來像」的貼圖，或指派 UI/Skin/Background.psd 等無關資源。
+  - 若預期資產不存在或不符：以 unity__Unity_RunCommand 程序化建立 Texture2D + Sprite.Create，存至 Assets/_Generated/ 再指派。
+
   冪等與續跑（強制）：
   - 每步一律「先檢查現狀」，再決定是否動手。
-  - 若目標已滿足：用 MCP 讀取驗證即可，在回覆中明確寫「已存在，跳過建立」並結束本任務。
+  - 若目標已滿足（含 Sprite 路徑與幾何）：用 MCP 讀取驗證即可，在回覆中明確寫「已存在，跳過」並結束本任務。
+  - 若物件存在但 Sprite 資產錯誤（例如 Background.psd）：視為未達標，必須修正而非跳過。
   - 若先前步驟中斷後重跑，假設 Editor 內已有部分成果，勿從零重做。
 
   Unity 2D 基本場景常識：
@@ -69,7 +83,7 @@ system_context: |
   - 2D 物件的 Z 軸通常為 0。相機的 Z 軸通常設為 -10，以便由外往內看整個 2D 平面。
 
   Tool 使用規則：
-  - 修改 2D 屬性：優先使用 unity__Unity_RunCommand 編譯執行內聯 C# 程式碼，直接取得 SpriteRenderer 並修改其屬性。
+  - 修改 2D 屬性與建立 Sprite：優先使用 unity__Unity_RunCommand 編譯執行內聯 C# 程式碼。
 
 ###############################################################################
 # EXECUTION STRATEGY
@@ -140,23 +154,28 @@ tasks:
       - 將其類型設為 Global (`lightType = Light2D.LightType.Global`)，以照亮整個 2D 平面。
 
   ###########################################################################
-  # CREATE 2D SPRITE OBJECT
+  # CREATE / FIX 2D SPRITE OBJECT
   ###########################################################################
 
   - id: create_2d_sprite_object
-    title: 建立 2D 矩形物件
-    objective: 在場景中央建立一個用於 2D 渲染的 Sprite 物件。
+    title: 建立或修正 2D 矩形 Sprite 物件
+    objective: 確保 RedSquare2D 存在，且 Sprite 為 Assets/_Generated/ 下程序化方形資產。
     prompt: |
-      先以 MCP 檢查場景中是否已有名為 "RedSquare2D" 的 GameObject。
-      若已存在且擁有 SpriteRenderer，回報「2D 物件已存在，跳過建立」。
+      先以 MCP 讀取場景中 "RedSquare2D"（若存在）的 SpriteRenderer.sprite 名稱、資產路徑與 rect。
 
-      僅在不存在時建立：
-      - Name: RedSquare2D
-      - 元件：必須掛載 `SpriteRenderer`（禁止掛載 3D 的 MeshRenderer）。
-      - 為 SpriteRenderer 指派 Unity 內建的預設方形圖片（提示：C# 中可透過 `AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd")` 取得預設白方塊 Sprite，指派給 `sprite` 屬性）。
-      - Transform 配置（置中）：
-        Position: { x: 0, y: 0, z: 0 }
-        Scale: { x: 1, y: 1, z: 1 }
+      僅當下列**全部**成立時，回報「2D 物件與 Sprite 已符合，跳過建立」：
+      - GameObject "RedSquare2D" 存在且 Active
+      - 擁有 SpriteRenderer（無 MeshRenderer）
+      - sprite 資產路徑為 Assets/_Generated/RedSquare2D.png（或該 PNG 匯入後的 Sprite 子資產）
+      - rect 為 32×32 方形
+
+      若 GameObject 不存在、缺少 SpriteRenderer、或 Sprite 為 Background.psd / UI/Skin / 其他非 _Generated 路徑：
+      1. 確保資料夾 Assets/_Generated/ 存在。
+      2. 以 unity__Unity_RunCommand 程序化建立 32×32 Texture2D，填滿白色方形像素，Sprite.Create 後存為 Assets/_Generated/RedSquare2D.png，並 AssetDatabase 刷新。
+      3. 若 RedSquare2D 不存在則建立；若存在則保留 Transform，修正 SpriteRenderer.sprite 指向上述資產。
+      4. 禁止指派 GetBuiltinExtraResource、Background.psd 或專案內「看起來像」的近似貼圖。
+      5. Transform（置中）：Position {0,0,0}，Scale {1,1,1}。
+      6. 回報 sprite 資產路徑、rect 尺寸與 GameObject 狀態。
 
   ###########################################################################
   # SET SPRITE RED (2D WAY)
@@ -164,15 +183,18 @@ tasks:
 
   - id: set_sprite_red
     title: 修改 Sprite 顏色為純紅
-    objective: 使用正確的 2D API 將 Sprite 改為紅色。
+    objective: 使用 SpriteRenderer.color 將 RedSquare2D 顯示為純紅色。
     prompt: |
-      先檢查 "RedSquare2D" 的 SpriteRenderer 顏色是否已是紅色。
-      若已是紅色：回報「已是紅色，跳過修改」。
+      先以 MCP 讀取 "RedSquare2D" 的 SpriteRenderer：sprite 資產路徑、rect、color。
 
-      若仍為白色或預設色：
-      - 透過執行內聯 C# 程式碼（unity__Unity_RunCommand），獲取 "RedSquare2D" 物件上的 `SpriteRenderer` 組件。
-      - 直接將其 `color` 屬性設為純紅色：`spriteRenderer.color = new Color(1f, 0f, 0f, 1f);`。
-      - 嚴禁觸碰 sharedMaterial.color。
+      若 sprite 不是 Assets/_Generated/RedSquare2D.png（或子資產），先回報「Sprite 資產不符，需先執行 create_2d_sprite_object 修正」，勿僅改色掩蓋錯誤資產。
+
+      若 color 已是 (1, 0, 0, 1) 且 Sprite 資產路徑正確：回報「已是紅色且資產正確，跳過修改」。
+
+      否則：
+      - 透過 unity__Unity_RunCommand 取得 SpriteRenderer，設 `color = new Color(1f, 0f, 0f, 1f)`。
+      - 嚴禁 MeshRenderer.sharedMaterial.color。
+      - 回報修正後的 color 與 sprite 路徑。
 
   ###########################################################################
   # FINAL 2D VALIDATION
@@ -182,13 +204,19 @@ tasks:
     title: 最終 2D 場景驗證
     objective: 確保整個 2D 場景無缺失項目且符合 DoD。
     prompt: |
-      對照 definition_of_done 進行全面 JSON 數據審查：
-      - 檢查場景儲存路徑是否為 Assets/_Scenes/Example2DScene.unity
-      - 驗證 Main Camera 的 orthographic 是否為 true，Z 軸是否為 -10
-      - 驗證 RedSquare2D 的 SpriteRenderer 是否存在，且 color 欄位精準為 (1, 0, 0, 1)
-      - 檢查有無任何 Missing Reference 或 3D 殘留組件
+      對照 definition_of_done 進行全面 MCP 唯讀審查：
+      - 場景儲存路徑是否為 Assets/_Scenes/Example2DScene.unity
+      - Main Camera orthographic 是否為 true，Z 是否為 -10
+      - RedSquare2D 是否存在、Active、僅含 SpriteRenderer（無 3D 元件）
+      - SpriteRenderer.sprite 是否來自 Assets/_Generated/RedSquare2D.png（禁止 Background.psd / UI/Skin）
+      - Sprite rect 是否為 32×32 方形
+      - SpriteRenderer.color 是否精準為 (1, 0, 0, 1)
+      - 有無 Missing Reference
 
-      若一切正常，儲存場景，並詳細回報：
+      任一 Sprite 路徑或幾何不符：判定驗證失敗，列出具體讀取值與預期值。
+
+      若一切正常，儲存場景並回報：
       1. 2D 相機狀態
-      2. SpriteRenderer 顏色屬性值
-      3. 確認 2D 工作流建構成功！
+      2. Sprite 資產路徑與 rect
+      3. SpriteRenderer.color
+      4. 確認 2D 工作流建構成功
