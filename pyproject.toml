@@ -43,6 +43,9 @@ py-modules = [
 where = ["."]
 include = ["harness*", "core*"]
 
+[tool.setuptools.package-data]
+"core.scaffold" = ["templates/**/*"]
+
 [tool.uv.sources]
 aicentral = { path = "../aicentral", editable = true }
 

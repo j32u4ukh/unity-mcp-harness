@@ -6,12 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from core.pipeline.execution import build_plan_for_execution, get_next_runnable_task
 from core.pipeline.goals_writeback import write_back_task_list_goals
 from core.pipeline.prepare import prepare_harness_queue
 from core.pipeline.store import load_task_list
 from unity_common import (
+    add_harness_llm_config_args,
     handle_errors,
     print_banner,
     register_unity_servers,
@@ -106,6 +108,36 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="以最新 build_goals 規範化並同步合併至 task_list（保留 completed 紀錄）",
     )
+    parser.add_argument(
+        "--init",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="ROOT",
+        help="初始化外部工作區（省略 ROOT 則為目前目錄）；完成後 exit，不跑建構",
+    )
+    parser.add_argument(
+        "--init-force",
+        action="store_true",
+        help="與 --init 合用：覆寫已存在的非機密檔（含 secret.yaml，請謹慎）",
+    )
+    parser.add_argument(
+        "--init-http",
+        action="store_true",
+        help="與 --init 合用：使用 HTTP MCP 範本建立 unity_servers.json（預設 stdio）",
+    )
+    parser.add_argument(
+        "--bootstrap-state",
+        action="store_true",
+        help="唯讀 MCP 盤點既有 Unity 專案並寫入 project_state/（需先 --init 與設定 local.env.ps1）",
+    )
+    parser.add_argument(
+        "--bootstrap-prompt",
+        type=str,
+        default=None,
+        help="自訂基線盤點 prompt（預設 unity_explore.yaml probe_prompt 或內建範本）",
+    )
+    add_harness_llm_config_args(parser)
     return parser.parse_args()
 
 
@@ -171,8 +203,39 @@ def _print_results(results) -> None:
 
 
 def main() -> None:
-    require_aicentral_config()
     args = parse_args()
+    if args.init is not None:
+        from core.scaffold.init_workspace import format_init_report, init_workspace
+
+        target = Path.cwd() if args.init == "" else Path(args.init)
+        transport = "http" if args.init_http else "stdio"
+        report = init_workspace(
+            target,
+            force=args.init_force,
+            mcp_transport=transport,
+        )
+        print(format_init_report(report))
+        sys.exit(0 if report.ok else 1)
+
+    if args.bootstrap_state:
+        require_aicentral_config(
+            aicentral_config=args.aicentral_config,
+            secret=args.secret,
+        )
+        from core.project_state.bootstrap import format_bootstrap_report, run_bootstrap_state
+
+        try:
+            report = run_bootstrap_state(
+                unity_config_path=args.unity_config,
+                prompt=args.bootstrap_prompt,
+            )
+        except Exception as exc:
+            handle_errors(exc)
+            sys.exit(1)
+        print(format_bootstrap_report(report))
+        sys.exit(0 if report.ok else 1)
+
+    require_aicentral_config()
     replan = args.replan or args.init_tasks or args.sync_plan
 
     try:

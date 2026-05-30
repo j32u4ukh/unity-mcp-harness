@@ -1,0 +1,4 @@
+# Harness 工作區中繼資料（非 Unity 專案設定檔）
+# 填寫本機 Unity 遊戲專案絕對路徑；Harness 執行時可參考。
+unity_project_path: "C:\\Path\\To\\Your\\UnityProject"
+unity_editor_path: "C:\\Program Files\\Unity\\Hub\\Editor\\6000.0.0f1\\Editor\\Unity.exe"

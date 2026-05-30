@@ -2,12 +2,16 @@
 
 以下改成命令提示字元呈現（`PS 目前目錄> 指令`），可直接對照你終端機狀態。
 
-**路徑約定**：起始目錄為 repo 根目錄 `llm-server/`。
+**路徑約定**：
+
+- **引擎開發**：repo 根目錄 `llm-server/`，Harness 原始碼在 `unity-mcp-harness/`
+- **外部工作區（推薦）**：任意目錄 + `UNITY_MCP_HOME`；以 `unity-mcp-harness --init` 建立（見 [EXTERNAL_PROJECT.md](EXTERNAL_PROJECT.md)）
 
 ```text
 llm-server/
 ├── aicentral/
-└── unity-mcp-harness/    ← Harness 工作目錄
+├── unity-mcp-harness/    ← Harness 引擎（pip 安裝）
+└── planetary-malignamcy/ ← 範例外部工作區（--init 產物）
 ```
 
 ---

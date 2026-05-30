@@ -1,0 +1,14 @@
+{
+  "unity": {
+    "transport": "http",
+    "url": "http://localhost:8080/mcp",
+    "auth_type": "none",
+    "description": "預設 Unity 實例（MCP for Unity / 本機 HTTP）"
+  },
+  "unity_alt": {
+    "transport": "http",
+    "url": "http://localhost:8081/mcp",
+    "auth_type": "none",
+    "description": "第二個 Unity Editor 實例（不同 port）"
+  }
+}

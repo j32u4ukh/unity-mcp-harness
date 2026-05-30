@@ -201,8 +201,13 @@ def build_normalize_user_prompt(
     ]
     if supplement_context.strip():
         sections.extend(["", supplement_context.strip()])
+    from core.project_state.context import format_project_state_for_planning
+
+    project_state_ctx = format_project_state_for_planning()
+    if project_state_ctx.strip():
+        sections.extend(["", "【Unity 專案狀態文件樹 project_state/】", project_state_ctx.strip()])
     if extra_context.strip():
-        sections.extend(["", "【Unity 專案補充（唯讀）】", extra_context.strip()])
+        sections.extend(["", "【Unity 專案補充（唯讀 MCP）】", extra_context.strip()])
     return "\n".join(sections)
 
 

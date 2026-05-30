@@ -26,7 +26,6 @@ from core.pipeline.execution import (
     harness_task_to_build_task,
     sorted_runnable_tasks,
 )
-from core.pipeline.runner import HarnessTaskRunner, classify_task_outcome
 from core.pipeline.tool_adapter import (
     capture_post_read_snapshot,
     capture_pre_read_snapshot,
@@ -39,9 +38,7 @@ from core.pipeline.store import default_task_list_path, inject_subtask, load_tas
 __all__ = [
     "HarnessPrepareResult",
     "bootstrap_task_list",
-    "HarnessTaskRunner",
     "build_plan_for_execution",
-    "classify_task_outcome",
     "capture_pre_read_snapshot",
     "capture_post_read_snapshot",
     "get_next_runnable_task",

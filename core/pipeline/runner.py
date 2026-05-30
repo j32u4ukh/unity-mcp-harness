@@ -17,6 +17,7 @@ from core.pipeline.tool_adapter import (
     capture_post_read_snapshot,
     capture_pre_read_snapshot,
 )
+from core.project_state.update import record_task_completion
 from tasks import TaskResult
 from unity_common import task_reply_indicates_failure
 
@@ -146,6 +147,8 @@ class HarnessTaskRunner:
                     action="Dynamic_Task_Injection",
                     summary=f"inject {subtask.id}",
                 )
+
+        record_task_completion(task, result)
 
         self._touch_document()
         self._persist()

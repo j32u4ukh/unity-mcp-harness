@@ -252,6 +252,11 @@ def format_task_prompt(
         lines.extend(["", "【Agent 憲法 / 整體情境】", plan.system_context])
 
     if harness_task is not None and isinstance(harness_task, HarnessTask):
+        from core.project_state.context import format_project_state_for_task
+
+        state_ctx = format_project_state_for_task(harness_task)
+        if state_ctx:
+            lines.extend(["", state_ctx])
         lines.extend(
             [
                 "",

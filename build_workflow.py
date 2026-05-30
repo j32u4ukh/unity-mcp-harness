@@ -18,6 +18,7 @@ from core.pipeline.execution import get_next_runnable_task, harness_task_to_buil
 from core.pipeline.runner import HarnessTaskRunner
 from core.pipeline.schema import HarnessTask, TaskListDocument
 from core.pipeline.store import default_task_list_path
+from core.project_state import begin_session, end_session
 from tasks import BuildPlan, BuildTask, TaskResult, format_task_prompt
 from unity_common import (
     ask_unity,
@@ -248,5 +249,9 @@ def run_build_plan(
         "resume": resume,
         "has_next": True,
     }
-    final = graph.invoke(initial)
-    return list(final.get("results", []))
+    begin_session()
+    try:
+        final = graph.invoke(initial)
+        return list(final.get("results", []))
+    finally:
+        end_session(flush=True)

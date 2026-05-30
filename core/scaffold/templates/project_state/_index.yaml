@@ -1,0 +1,18 @@
+version: 1
+description: |
+  Unity 專案狀態索引（與 task_list.yaml 搭配）。
+  由 Harness 任務完成後自動更新；執行前仍須 MCP 感知驗證。
+updated_at: null
+entries:
+  - key: scenes/overview
+    path: scenes/_overview.md
+    summary: （待首個場景相關任務完成後更新）
+    tags: [scene, overview]
+  - key: assets/overview
+    path: assets/_overview.md
+    summary: （待首個資產相關任務完成後更新）
+    tags: [asset, overview]
+  - key: systems/overview
+    path: systems/_overview.md
+    summary: （待首個系統相關任務完成後更新）
+    tags: [system, overview]

@@ -16,6 +16,8 @@
 
 CLI 入口點為 `unity-mcp-harness`（並保留 `unity-mcp-build` 相容別名）；套件名為 `unity-mcp-harness`。
 
+**外部工作區**（多專案、與引擎分離）見 **[docs/EXTERNAL_PROJECT.md](docs/EXTERNAL_PROJECT.md)** — 以 `unity-mcp-harness --init` 一鍵建立工作區。
+
 ---
 
 ## 快速開始
@@ -31,6 +33,18 @@ pip install -e ".[mcp]"
 cd ..\unity-mcp-harness
 pip install -e .
 ```
+
+**外部工作區（推薦新專案）** — 不必在 harness repo 內放設定：
+
+```powershell
+mkdir C:\path\to\my-harness-workspace
+cd C:\path\to\my-harness-workspace
+unity-mcp-harness --init
+# 編輯 config\secret.yaml、config\local.env.ps1
+$env:UNITY_MCP_HOME = (Get-Location).Path
+```
+
+詳見 [docs/EXTERNAL_PROJECT.md](docs/EXTERNAL_PROJECT.md)。
 
 ### 2. Unity MCP
 
@@ -68,6 +82,7 @@ unity-mcp-harness
 | 指令 | 說明 |
 |------|------|
 | `unity-mcp-harness` | 依 `build_goals.yaml` 順序執行任務（主要入口） |
+| `unity-mcp-harness --init [ROOT]` | 初始化外部工作區（scaffold 範本 + scripts） |
 | `unity-mcp-build` | 舊版相容別名（等同 `unity-mcp-harness`） |
 | `unity-mcp-chat` | **Unity 專案探索**（多輪 REPL；連線 MCP 查詢場景／資產現況） |
 | `unity-mcp-ask "問題"` | **Unity 專案探索**（單次；`--probe` 使用預設唯讀探查 prompt） |

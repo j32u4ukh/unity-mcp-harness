@@ -1,0 +1,12 @@
+# Harness 工作區 — 機密與執行期產物
+config/secret.yaml
+config/local.env.ps1
+config/rate_limit_store.json
+
+task_list.yaml
+task_list.*.yaml
+*.bak
+
+__pycache__/
+*.pyc
+.env
