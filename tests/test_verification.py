@@ -17,7 +17,7 @@ from tasks import TaskResult
 
 
 def test_parse_verification_json_plain() -> None:
-    payload = {"verified": True, "checks": [], "active_scene_path": "Assets/_Scenes/A.unity"}
+    payload = {"verified": True, "checks": [], "active_scene_path": "Assets/Scenes/A.unity"}
     text = json.dumps(payload, ensure_ascii=False)
     assert parse_verification_json(text) == payload
 
@@ -43,9 +43,9 @@ def test_infer_targets_from_prompt() -> None:
     task = HarnessTask(
         id="add_player_sprite",
         description="d",
-        prompt='在場景 (Assets/_Scenes/Example2DScene.unity) 建立名為 "Player" 的物件',
+        prompt='在場景 (Assets/Scenes/Example2DScene.unity) 建立名為 "Player" 的物件',
     )
-    assert infer_scene_path(task) == "Assets/_Scenes/Example2DScene.unity"
+    assert infer_scene_path(task) == "Assets/Scenes/Example2DScene.unity"
     assert infer_game_object_name(task) == "Player"
 
 
@@ -60,7 +60,7 @@ def test_build_verification_prompt_includes_scene_and_go() -> None:
         id="t",
         description="建立玩家",
         prompt='名為 "Player"',
-        target=TaskTarget(game_object="Player", scene_path="Assets/_Scenes/Main.unity"),
+        target=TaskTarget(game_object="Player", scene_path="Assets/Scenes/Main.unity"),
     )
     prompt = build_verification_prompt(task, agent_reply_excerpt="done")
     assert "Main.unity" in prompt

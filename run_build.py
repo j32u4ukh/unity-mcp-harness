@@ -11,7 +11,7 @@ from pathlib import Path
 from core.pipeline.execution import build_plan_for_execution, get_next_runnable_task
 from core.pipeline.goals_writeback import write_back_task_list_goals
 from core.pipeline.prepare import prepare_harness_queue
-from core.pipeline.store import load_task_list
+from core.pipeline.store import default_task_list_path, load_task_list
 from unity_common import (
     add_harness_llm_config_args,
     handle_errors,
@@ -22,11 +22,19 @@ from unity_common import (
     resolve_unity_llm_model,
 )
 from build_workflow import run_build_plan
+from core.cli_plan import (
+    CLI_EPILOG,
+    add_plan_cli_arguments,
+    print_deprecation_notices,
+    resolve_plan_cli,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="依任務清單順序透過 Unity MCP 建構場景（LangGraph 編排）",
+        epilog=CLI_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "-g",
@@ -62,26 +70,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="略過 LLM 規範化（除錯用；bootstrap 時使用 passthrough）",
     )
-    parser.add_argument(
-        "--replan",
-        action="store_true",
-        help="強制重跑 Plan Normalize 並重建 task_list（保留 completed 紀錄）",
-    )
-    parser.add_argument(
-        "--init-tasks",
-        action="store_true",
-        help="強制 bootstrap task_list.yaml（等同 --replan）",
-    )
-    parser.add_argument(
-        "--write-back-goals",
-        action="store_true",
-        help="將規範化後 tasks 寫回 build_goals.yaml",
-    )
-    parser.add_argument(
-        "--backup",
-        action="store_true",
-        help="與 --write-back-goals 合用：寫回前備份 .bak",
-    )
+    add_plan_cli_arguments(parser)
     parser.add_argument(
         "--plan-with-mcp",
         action="store_true",
@@ -102,11 +91,6 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="規劃補充 prompt JSON（預設 config/prompt_supplements.json）",
-    )
-    parser.add_argument(
-        "--sync-plan",
-        action="store_true",
-        help="以最新 build_goals 規範化並同步合併至 task_list（保留 completed 紀錄）",
     )
     parser.add_argument(
         "--init",
@@ -240,17 +224,40 @@ def main() -> None:
         print(format_bootstrap_report(report))
         sys.exit(0 if report.ok else 1)
 
-    require_aicentral_config()
-    replan = args.replan or args.init_tasks or args.sync_plan
+    try:
+        plan_cli = resolve_plan_cli(args)
+    except SystemExit as exc:
+        print(exc, file=sys.stderr)
+        sys.exit(2)
+    print_deprecation_notices()
 
+    if plan_cli.standalone_export_from_task_list:
+        task_list_path = default_task_list_path()
+        try:
+            task_list = load_task_list(task_list_path)
+        except FileNotFoundError as exc:
+            print(f"錯誤: {exc}\n請先執行 --goals-to-task-list 或 --replan-and-run 建立 task_list。", file=sys.stderr)
+            sys.exit(1)
+        except (ValueError, OSError) as exc:
+            handle_errors(exc)
+            sys.exit(1)
+        try:
+            out = write_back_task_list_goals(task_list, args.goals, backup=args.backup)
+        except (FileNotFoundError, ValueError, OSError) as exc:
+            handle_errors(exc)
+            sys.exit(1)
+        print(f"（--export-goals-from-task-list：已將 task_list 規劃欄位寫回 {out}）")
+        return
+
+    require_aicentral_config()
     try:
         specs = resolve_server_specs(config_path=args.unity_config)
         prepared = prepare_harness_queue(
             goals_path=args.goals,
             skip_plan_normalize=args.skip_plan_normalize,
-            replan=replan,
-            init_tasks=args.init_tasks,
-            write_back_goals=args.write_back_goals and not args.sync_plan,
+            replan=plan_cli.need_replan,
+            init_tasks=False,
+            write_back_goals=plan_cli.write_back_in_prepare,
             backup_goals=args.backup,
             plan_with_mcp=args.plan_with_mcp,
             plan_interactive=args.plan_interactive,
@@ -297,11 +304,15 @@ def main() -> None:
     else:
         print("\n（無待執行任務：全部 completed / skipped）")
 
-    if args.sync_plan:
-        if args.write_back_goals:
+    if plan_cli.goals_to_task_list:
+        if plan_cli.export_goals_from_task_list:
             write_back_task_list_goals(task_list, args.goals, backup=args.backup)
-            print("（已將 task_list 的規劃欄位寫回 build_goals）")
-        print("\n（sync-plan：已完成藍圖與 task_list 同步，未執行 Unity MCP 建構）")
+            print("（已將 task_list 規劃欄位寫回 build_goals.yaml）")
+        if plan_cli.export_goals_from_normalize and not plan_cli.write_back_in_prepare:
+            print("（已於規劃階段將 Normalize 結果寫回 build_goals.yaml）")
+        print(
+            "\n（--goals-to-task-list：build_goals → task_list 已完成，未執行 Unity MCP 建構）"
+        )
         return
 
     if args.dry_run:

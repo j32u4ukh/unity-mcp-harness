@@ -32,7 +32,7 @@ DEFAULT_BOOTSTRAP_PROMPT = """\
 2. Hierarchy 主要 GameObject（名稱、Active 狀態、關鍵元件類型）
 3. Main Camera：Projection、位置等與可視化相關設定
 4. 光照方式（2D Global Light / 3D Directional 等，若存在）
-5. 重要資產路徑（尤其 Assets/_Scenes/、Assets/_Generated/ 或專案內自訂資料夾）
+5. 重要資產路徑（尤其 Assets/Scenes/、Assets/Generated/ 或專案內自訂資料夾）
 6. 與 2D Sprite / URP 2D 相關的現有物件或資產（若存在）
 7. 明顯的 Missing Reference 或空場景說明
 

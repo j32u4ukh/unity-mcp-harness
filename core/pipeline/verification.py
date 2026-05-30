@@ -20,7 +20,7 @@ _GAME_OBJECT_NAME_PATTERNS = (
     re.compile(r'named\s*["\']([^"\']+)["\']', re.IGNORECASE),
     re.compile(r'GameObject\s*(?:named\s*)?["\']([^"\']+)["\']', re.IGNORECASE),
 )
-_SCENE_PATH_PATTERN = re.compile(r"(Assets/_Scenes/[^\s\)`\"']+\.unity)", re.IGNORECASE)
+_SCENE_PATH_PATTERN = re.compile(r"(Assets/[^\s\)`\"']+\.unity)", re.IGNORECASE)
 
 _VERIFIER_SYSTEM = """\
 你是 Unity Harness 驗證器。你只能使用 Unity MCP **唯讀**工具查詢 Editor 現場。

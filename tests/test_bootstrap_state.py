@@ -25,7 +25,7 @@ def test_bootstrap_state_writes_files(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("UNITY_MCP_HOME", str(tmp_path))
 
     fake_reply = (
-        "場景: Assets/_Scenes/Demo.unity\n"
+        "場景: Assets/Scenes/Demo.unity\n"
         "Hierarchy: Main Camera, Player\n"
         "2D: SpriteRenderer on Player"
     )

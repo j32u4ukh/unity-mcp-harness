@@ -6,10 +6,10 @@
       "description": "Sprite 通用：先查預期資產，找不到則 Texture2D + Sprite.Create；禁止近似匹配",
       "match_keywords": ["sprite", "SpriteRenderer", "貼圖", "精靈", "方形", "square", "矩形", "三角形", "triangle"],
       "match_task_id_substrings": ["sprite"],
-      "prompt_block": "【Sprite 通用規則】\nPhase 1：讀取目標 GameObject 的 SpriteRenderer.sprite 與資產路徑。若藍圖/任務已指明預期資產（例如 Assets/_Generated/ 下檔案）且通過驗收條件，回報「已存在，跳過」。\nPhase 2：\n- 禁止在專案搜尋「看起來像」的貼圖或隨意指派無關 UI/圖集資源。\n- 若預期資產不存在或不符：以 unity__Unity_RunCommand 程序化建立 Texture2D + Sprite.Create，依藍圖指明的幾何形狀填像素（方形、三角形等），存至 Assets/_Generated/ 並指派給 SpriteRenderer。\n- 幾何形狀與驗收條件以 build_goals/本任務描述為準；若未指明，應在規劃期澄清而非自行猜測。\nPhase 3：回報 sprite 資產路徑、rect 尺寸，以及與任務一致的幾何驗證結果。",
+      "prompt_block": "【Sprite 通用規則】\nPhase 1：讀取目標 GameObject 的 SpriteRenderer.sprite 與資產路徑。若藍圖/任務已指明預期資產（例如 Assets/Generated/ 下檔案）且通過驗收條件，回報「已存在，跳過」。\nPhase 2：\n- 禁止在專案搜尋「看起來像」的貼圖或隨意指派無關 UI/圖集資源。\n- 若預期資產不存在或不符：以 unity__Unity_RunCommand 程序化建立 Texture2D + Sprite.Create，依藍圖指明的幾何形狀填像素（方形、三角形等），存至 Assets/Generated/ 並指派給 SpriteRenderer。\n- 幾何形狀與驗收條件以 build_goals/本任務描述為準；若未指明，應在規劃期澄清而非自行猜測。\nPhase 3：回報 sprite 資產路徑、rect 尺寸，以及與任務一致的幾何驗證結果。",
       "expected": {
         "forbid_approximate_asset_match": true,
-        "generated_asset_dir": "Assets/_Generated"
+        "generated_asset_dir": "Assets/Generated"
       },
       "harness_pre_read": "讀 SpriteRenderer.sprite、資產路徑與 rect",
       "harness_post_read": "驗證資產路徑與幾何驗收條件（依任務描述）"
@@ -18,7 +18,7 @@
   "clarification_templates": [
     {
       "id": "sprite_geometry_unspecified",
-      "question": "此 Sprite 任務的幾何形狀、預期資產路徑與驗收條件為何？（例如 square / triangle，或 Assets/_Generated/XXX.png；將寫入 prompt_supplements.json 供下次複用）",
+      "question": "此 Sprite 任務的幾何形狀、預期資產路徑與驗收條件為何？（例如 square / triangle，或 Assets/Generated/XXX.png；將寫入 prompt_supplements.json 供下次複用）",
       "when_keywords": ["sprite", "SpriteRenderer", "貼圖", "精靈"],
       "when_task_id_substrings": ["sprite"],
       "unless_supplement_ids": [],

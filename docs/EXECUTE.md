@@ -158,23 +158,43 @@ PS unity-mcp-harness> unity-mcp-harness --json
 PS unity-mcp-harness> unity-mcp-harness --retry-failed
 ```
 
-### 6.4 藍圖改完後同步 task_list
+### 6.4 藍圖 → 只更新 task_list（不跑 Unity）
 
 ```powershell
-PS unity-mcp-harness> unity-mcp-harness --sync-plan
+PS planetary-malignamcy> .\scripts\harness-goals-to-task-list.ps1
+# 或
+PS unity-mcp-harness> unity-mcp-harness --goals-to-task-list
 ```
 
-若要把規劃欄位寫回 `build_goals.yaml`：
+來源：`build_goals.yaml` → 目標：`task_list.yaml`（保留 `completed` 的執行紀錄）。
+
+若要把 **`task_list` 的規劃欄位** 寫回藍圖（單獨指令，不必先 `--goals-to-task-list`）：
 
 ```powershell
-PS unity-mcp-harness> unity-mcp-harness --sync-plan --write-back-goals --backup
+.\scripts\harness-export-goals-from-task-list.ps1 -Backup
+# 或
+unity-mcp-harness --export-goals-from-task-list --backup
 ```
 
-### 6.5 強制重新規劃（重建 task_list）
+改藍圖後先同步隊列再寫回：
 
 ```powershell
-PS unity-mcp-harness> unity-mcp-harness --replan
+unity-mcp-harness --goals-to-task-list --export-goals-from-task-list --backup
 ```
+
+### 6.5 重算隊列並執行建構
+
+```powershell
+PS unity-mcp-harness> unity-mcp-harness --replan-and-run
+```
+
+等同舊版 `--replan`（規劃後**會**連 Unity）。若只要將 **Normalize 結果** 寫回藍圖：
+
+```powershell
+unity-mcp-harness --replan-and-run --export-goals-from-normalize --backup
+```
+
+完整旗標說明見 [CLI.md](CLI.md)。
 
 ---
 
@@ -261,4 +281,4 @@ PS unity-mcp-build> .\unity-mcp-build.exe
 
 ## 11) 相容別名
 
-`unity-mcp-build` 與 `unity-mcp-harness` 等價，可替換使用。
+舊版 `unity-mcp-build` 已移除；請見 [CLI.md](CLI.md) 的重新安裝步驟。

@@ -38,7 +38,7 @@ def test_record_task_completion_updates_files(
         status="in_progress",
         priority=10,
         prompt="list hierarchy",
-        target=TaskTarget(scene_path="Assets/_Scenes/Demo.unity"),
+        target=TaskTarget(scene_path="Assets/Scenes/Demo.unity"),
     )
     result = TaskResult(
         id="inspect_scene",

@@ -221,7 +221,7 @@ tasks:
     priority: 10
     target:
       game_object: null
-      scene_path: "Assets/_Scenes/Example2DScene.unity"
+      scene_path: "Assets/Scenes/Example2DScene.unity"
     expected:
       properties: {}               # 本任務完成後應滿足的斷言（可選）
     pipeline_records:
