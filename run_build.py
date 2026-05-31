@@ -8,7 +8,11 @@ import json
 import sys
 from pathlib import Path
 
-from core.pipeline.execution import build_plan_for_execution, get_next_runnable_task
+from core.pipeline.execution import (
+    build_plan_for_execution,
+    find_sequential_blocker,
+    get_next_runnable_task,
+)
 from core.pipeline.goals_writeback import write_back_task_list_goals
 from core.pipeline.prepare import prepare_harness_queue
 from core.pipeline.store import default_task_list_path, load_task_list
@@ -327,7 +331,14 @@ def main() -> None:
         if args.retry_failed:
             print("（已啟用 --retry-failed：failed 任務會納入本輪）")
     else:
-        print("\n（無待執行任務：全部 completed / skipped）")
+        blocker = find_sequential_blocker(task_list)
+        if blocker is not None and not args.retry_failed:
+            print(
+                f"\n（順序阻擋：前置任務 [{blocker.id}] status=failed，"
+                f"後續任務暫不執行；請先 --retry-failed 或修正 task_list）"
+            )
+        else:
+            print("\n（無待執行任務：全部 completed / skipped）")
 
     if plan_cli.goals_to_task_list:
         if plan_cli.export_goals_from_task_list:
@@ -360,6 +371,7 @@ def main() -> None:
                 task_list_path=task_list_path,
                 resume=resume,
                 skip_verification=args.skip_verification,
+                retry_failed=args.retry_failed,
             )
     except Exception as exc:
         handle_errors(exc)

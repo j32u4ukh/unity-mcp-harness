@@ -19,6 +19,8 @@
 | `--replan-and-run` | 同上，然後執行 pending 任務 | 是 |
 | （無旗標，已有 `task_list`） | 只執行隊列，**不**自動重讀藍圖 | 是 |
 
+**順序阻擋**：若依 priority 排序的前置任務為 `failed`，後續 `pending` / `in_progress` **不會執行**，直到 `--retry-failed` 重試該 failed 項。`--continue-on-error` 僅影響**同一輪**內是否繼續（仍會略過 failed 跑後續）。
+
 ## 寫回 `build_goals.yaml`（勿混用）
 
 | 參數 | 資料來源 | 必須搭配 |

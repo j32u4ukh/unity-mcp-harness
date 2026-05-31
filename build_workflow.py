@@ -128,6 +128,8 @@ def _make_run_task_node(
     harness_by_id: dict[str, HarnessTask],
     resume: bool,
     pipeline_runner: HarnessTaskRunner | None = None,
+    stop_on_error: bool = True,
+    retry_failed: bool = False,
 ):
     """建立閉包節點：讀取 state 中當前 task_index 並執行。"""
 
@@ -136,7 +138,12 @@ def _make_run_task_node(
         task: BuildTask
         ht: HarnessTask | None
         if pipeline_runner is not None:
-            next_ht = get_next_runnable_task(pipeline_runner.document)
+            block_after_failed = stop_on_error
+            next_ht = get_next_runnable_task(
+                pipeline_runner.document,
+                retry_failed=retry_failed,
+                block_after_failed=block_after_failed,
+            )
             if next_ht is None:
                 return {"has_next": False}
             task = harness_task_to_build_task(next_ht)
@@ -162,7 +169,14 @@ def _make_run_task_node(
         )
         if pipeline_runner is not None:
             harness_by_id[task.id] = pipeline_runner.get_task(task.id)
-            has_next = get_next_runnable_task(pipeline_runner.document) is not None
+            has_next = (
+                get_next_runnable_task(
+                    pipeline_runner.document,
+                    retry_failed=retry_failed,
+                    block_after_failed=stop_on_error,
+                )
+                is not None
+            )
             next_index = state.get("task_index", 0) + 1
         else:
             has_next = (state["task_index"] + 1) < len(plan.enabled_tasks())
@@ -199,6 +213,7 @@ def build_sequential_workflow(
     task_list_path: str | Path | None = None,
     resume: bool = False,
     skip_verification: bool = False,
+    retry_failed: bool = False,
 ) -> Any:
     """編譯 LangGraph：依 plan / task_list 順序執行任務。"""
     register_unity_servers(specs, config_path=unity_config_path)
@@ -233,6 +248,8 @@ def build_sequential_workflow(
         harness_by_id=harness_by_id,
         resume=resume,
         pipeline_runner=pipeline_runner,
+        stop_on_error=stop_on_error,
+        retry_failed=retry_failed,
     )
     graph.add_node("run_task", run_node)
     graph.add_edge(START, "run_task")
@@ -254,6 +271,7 @@ def run_build_plan(
     task_list_path: str | Path | None = None,
     resume: bool = False,
     skip_verification: bool = False,
+    retry_failed: bool = False,
 ) -> list[TaskResult]:
     """執行整份建構計畫並回傳各任務結果。
 
@@ -268,6 +286,7 @@ def run_build_plan(
         task_list_path=task_list_path,
         resume=resume,
         skip_verification=skip_verification,
+        retry_failed=retry_failed,
     )
     harness_by_id = harness_tasks_by_id(task_list) if task_list else {}
     initial: BuildState = {
