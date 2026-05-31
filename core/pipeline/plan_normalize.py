@@ -250,7 +250,7 @@ def normalize_plan(
         register_unity_servers(specs, config_path=unity_config_path)
         try:
             extra = ask_unity(
-                "唯讀：列出 Assets 下與 _Scenes 相關的資源路徑與目前場景名稱。"
+                "唯讀：列出 Assets 下與 Scenes 相關的資源路徑與目前場景名稱。"
                 "不要修改任何東西，只回傳列表摘要。",
                 mcp_servers=plan.mcp_servers,
                 model=resolve_unity_llm_model(plan.model),

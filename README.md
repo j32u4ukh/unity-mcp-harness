@@ -14,7 +14,7 @@
 - **[docs/HARNESS.md](docs/HARNESS.md)** — 框架規格（藍圖 vs 執行期、Phase 1–4、Plan Normalize）
 - **[docs/TO_HARNESS.md](docs/TO_HARNESS.md)** — 由現況到 Harness v1 的實作清單（可逐條勾選）
 
-CLI 入口點為 `unity-mcp-harness`（並保留 `unity-mcp-build` 相容別名）；套件名為 `unity-mcp-harness`。
+CLI 入口點為 `unity-mcp-harness`；旗標速查見 [docs/CLI.md](docs/CLI.md)。舊版 `unity-mcp-build` 已移除，請 `pip uninstall` 後重新 `pip install -e .`。
 
 **外部工作區**（多專案、與引擎分離）見 **[docs/EXTERNAL_PROJECT.md](docs/EXTERNAL_PROJECT.md)** — 以 `unity-mcp-harness --init` 一鍵建立工作區。
 
@@ -83,7 +83,8 @@ unity-mcp-harness
 |------|------|
 | `unity-mcp-harness` | 依 `build_goals.yaml` 順序執行任務（主要入口） |
 | `unity-mcp-harness --init [ROOT]` | 初始化外部工作區（scaffold 範本 + scripts） |
-| `unity-mcp-build` | 舊版相容別名（等同 `unity-mcp-harness`） |
+| `unity-mcp-harness --goals-to-task-list` | 僅藍圖 → `task_list`（不跑 Unity） |
+| `unity-mcp-harness --replan-and-run` | 重算隊列並執行建構 |
 | `unity-mcp-chat` | **Unity 專案探索**（多輪 REPL；連線 MCP 查詢場景／資產現況） |
 | `unity-mcp-ask "問題"` | **Unity 專案探索**（單次；`--probe` 使用預設唯讀探查 prompt） |
 | `unity-mcp-list-tools` | 列出 MCP 工具（不呼叫 LLM） |
@@ -119,6 +120,7 @@ pip install pyinstaller
 
 ## 文件
 
+- [docs/CLI.md](docs/CLI.md) — CLI 旗標速查與 pip 重新安裝
 - [docs/HARNESS.md](docs/HARNESS.md) — Harness 框架規格
 - [docs/TO_HARNESS.md](docs/TO_HARNESS.md) — 遷移與實作清單
 - [docs/README.md](docs/README.md) — 使用方式、呼叫鏈、任務定義

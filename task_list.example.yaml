@@ -17,9 +17,9 @@ tasks:
     prompt: |
       （由 Plan Normalize 或 bootstrap 自 build_goals 填入完整 prompt）
     target:
-      scene_path: "Assets/_Scenes/Example2DScene.unity"
+      scene_path: "Assets/Scenes/Example2DScene.unity"
     harness:
-      pre_read: "Unity_ListResources 檢查 Assets/_Scenes/Example2DScene.unity"
+      pre_read: "Unity_ListResources 檢查 Assets/Scenes/Example2DScene.unity"
     pipeline_records:
       actual_before: {}
       operations_executed: []

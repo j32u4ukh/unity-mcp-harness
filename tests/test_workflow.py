@@ -99,7 +99,7 @@ def test_run_build_plan_injects_harness_context(
         ]
     )
     exec_plan = build_plan_for_execution(blueprint, task_list)
-    run_build_plan(exec_plan, task_list=task_list, resume=True)
+    run_build_plan(exec_plan, task_list=task_list, resume=True, skip_verification=True)
 
     prompt_sent = mock_runner.ask.call_args[0][0]
     assert "from-task-list prompt" in prompt_sent
@@ -131,6 +131,7 @@ def test_run_build_plan_persists_task_list(
         exec_plan,
         task_list=task_list,
         task_list_path=path,
+        skip_verification=True,
     )
 
     loaded = load_task_list(path)
@@ -169,6 +170,7 @@ def test_run_build_plan_executes_injected_subtask_first(
         exec_plan,
         task_list=task_list,
         task_list_path=path,
+        skip_verification=True,
     )
 
     assert [r.id for r in results] == ["parent", "child"]
