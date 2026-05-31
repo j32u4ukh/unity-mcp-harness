@@ -126,6 +126,36 @@ def log_prompt_excerpt(prompt: str, *, max_len: int = 120) -> None:
     harness_log(f"  prompt: {text}")
 
 
+def log_plan_normalize_start(
+    *,
+    model: str,
+    blueprint_tasks: int,
+    plan_revision: int,
+) -> None:
+    harness_log(
+        f"Plan Normalize 開始（model={model}，藍圖任務={blueprint_tasks}，revision={plan_revision}）"
+    )
+
+
+def log_plan_normalize_llm_attempt(*, mode: str, attempt: int) -> None:
+    harness_log(f"  → Plan Normalize LLM 請求（mode={mode}，第 {attempt} 次）…")
+
+
+def log_plan_normalize_llm_done(*, mode: str, task_count: int) -> None:
+    harness_log(f"  ↳ Plan Normalize LLM 完成（mode={mode}，{task_count} 條 normalized_tasks）")
+
+
+def log_plan_normalize_fallback(reason: str) -> None:
+    text = " ".join((reason or "").split())
+    if len(text) > 400:
+        text = text[:399] + "…"
+    harness_log(f"Plan Normalize 失敗，改用 passthrough: {text}", level="WARN")
+
+
+def log_prepare_phase(phase: str) -> None:
+    harness_log(f"▶ {phase}")
+
+
 def _preview_json(value: Any, *, max_len: int = 160) -> str:
     try:
         text = json.dumps(value, ensure_ascii=False, default=str)

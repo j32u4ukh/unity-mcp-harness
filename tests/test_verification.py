@@ -65,6 +65,7 @@ def test_build_verification_prompt_includes_scene_and_go() -> None:
     prompt = build_verification_prompt(task, agent_reply_excerpt="done")
     assert "Main.unity" in prompt
     assert "Player" in prompt
+    assert "Harness 驗證 MCP 預算" in prompt
 
 
 def test_classify_task_outcome_requires_verification_pass() -> None:

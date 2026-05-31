@@ -120,7 +120,7 @@ class HarnessTaskRunner:
         unity_config_path: str | Path | None = None,
         skip_verification: bool = False,
         definition_of_done: list[str] | None = None,
-        verification_max_tool_rounds: int = 6,
+        verification_max_tool_rounds: int = 10,
         specs: dict[str, Any] | None = None,
     ) -> None:
         self.document = document
@@ -181,7 +181,7 @@ class HarnessTaskRunner:
         )
         return verification
 
-    def on_task_end(self, task_id: str, result: TaskResult) -> HarnessTask:
+    def on_task_end(self, task_id: str, result: TaskResult) -> tuple[HarnessTask, TaskResult]:
         task = self.get_task(task_id)
 
         summary = _summarize_reply(result)
@@ -251,4 +251,4 @@ class HarnessTaskRunner:
 
         self._touch_document()
         self._persist()
-        return task
+        return task, result

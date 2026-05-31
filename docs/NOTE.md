@@ -103,6 +103,8 @@ README 曾把 Cursor 的 `mcpServers` 範例寫成「複製到 unity_servers.jso
 - **`failed`**：Agent 文字看似成功，但驗證未通過 → `status` 亦為 `failed`。
 - **`skipped_by_idempotent`**：Agent 宣稱跳過，且驗證確認目標已存在。
 - 除錯可暫時關閉：`unity-mcp-harness --skip-verification`，或任務 `expected.skip_harness_verification: true`。
+- **驗證 MCP 預算**：Plan Normalize 會為每任務寫入 `harness.verify_read`（至多 2 次 tool 回合、優先單次 `gameobject-find`）；`build_goals.yaml` 可設 `verification_max_tool_rounds`（預設與 `max_tool_rounds` 相同）。CLI：`--verification-max-tool-rounds N`。
+- 若見 `MCP tool loop 已達上限（max_tool_rounds=…）`：驗證 LLM 在限額內未輸出 JSON，常因重複 `component-get` / 空 `componentRef`；沿用既有 `task_list` 時 prepare 會自動 backfill `verify_read`。
 
 仍非 Unity C# 斷言；最終依驗證 LLM 是否正確使用 MCP。要更硬可再加專用 `validate_scene` 任務。
 
@@ -119,6 +121,14 @@ workflow 每任務只有 **OK / FAIL**（+ 驗證結果），**不會**自動分
 **Agent 認知**：`harness/mcp_runner.compose_unity_agent_system()` 自動注入 `core/prompts/unity_observer_protocol.py`。LangGraph **task 圖**仍為 `run_task → 下一任務`；tool 級分流由 LLM 讀 JSON 決策，非另建 ToolNode 條件邊。
 
 **日誌**：`-v` 時 filtered 的 not-found 會顯示 `[filtered] expected_not_found`。
+
+### 10.1 單任務 MCP loop 唯讀快取（instanceID 級）
+
+**行為**：每次 `complete_with_mcp_loop`（單任務 Agent 或驗證回合）開始時重置。同一 loop 內對相同目標的重複 `gameobject-find` / `gameobject-component-get`（須含有效 `componentRef.instanceID`）/ `object-get-data` 會回傳 `harness_cache_hit` 包裝的快取結果，**不再呼叫 Unity**。
+
+**寫入**（`gameobject-create`、`script-execute`、`component-set` 等）會清空該 loop 快取。
+
+**日誌**：`[Harness Cache] 略過重複唯讀 MCP…` 或寫入後清除快取。
 
 ---
 

@@ -5,6 +5,7 @@ project: "示範專案 — 基礎場景"
 # LLM 別名（預設 gemini-flash；見 unity_common.DEFAULT_LLM_MODEL）
 # model: gemini-flash
 max_tool_rounds: 12
+verification_max_tool_rounds: 10
 
 mcp_servers:
   - unity

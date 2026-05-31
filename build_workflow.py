@@ -113,11 +113,11 @@ def _run_single_task(
         )
 
     if pipeline_runner is not None:
-        pipeline_runner.on_task_end(task.id, result)
-        ht = pipeline_runner.get_task(task.id)
+        ht, result = pipeline_runner.on_task_end(task.id, result)
+        final_ok = ht.status == "completed"
         log_task_end(
             task.id,
-            success=result.success,
+            success=final_ok,
             verification=ht.verification,
             error=result.error,
         )
@@ -243,6 +243,7 @@ def build_sequential_workflow(
             unity_config_path=unity_config_path,
             skip_verification=skip_verification,
             definition_of_done=plan.definition_of_done,
+            verification_max_tool_rounds=plan.verification_max_tool_rounds,
             specs=specs,
         )
 

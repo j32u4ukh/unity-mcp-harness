@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -42,3 +43,28 @@ def test_progress_hooks_restores_call_tool() -> None:
     with harness_progress_hooks():
         assert mgr_mod.MCPManager.call_tool is not original
     assert mgr_mod.MCPManager.call_tool is original
+
+
+def test_progress_hooks_logs_invoke_resolved(capsys: pytest.CaptureFixture[str]) -> None:
+    import aicentral.mcp.orchestrator as orch
+
+    configure_harness_log(quiet=False)
+    original = orch.invoke_resolved
+
+    def fake_invoke(*_args: Any, **_kwargs: Any) -> dict:
+        return {
+            "choices": [
+                {"message": {"role": "assistant", "content": "ok", "tool_calls": []}}
+            ]
+        }
+
+    orch.invoke_resolved = fake_invoke
+    try:
+        with harness_progress_hooks():
+            orch.invoke_resolved(MagicMock(), [], raw=True)
+    finally:
+        orch.invoke_resolved = original
+
+    err = capsys.readouterr().err
+    assert "LLM 第 1 輪請求" in err
+    assert "LLM 第 1 輪完成" in err

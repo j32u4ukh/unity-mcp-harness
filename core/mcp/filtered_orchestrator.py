@@ -8,6 +8,11 @@ from typing import Any
 from aicentral.mcp.manager import MCPError
 from aicentral.mcp.orchestrator import serialize_tool_result
 
+from core.mcp.read_cache import (
+    on_write_tool,
+    record_read_result,
+    try_cache_read,
+)
 from core.mcp.tool_error_filter import (
     extract_error_text_from_tool_result,
     format_fatal_tool_content,
@@ -55,6 +60,19 @@ def run_tool_calls_with_harness_filter(
         else:
             arguments = {}
 
+        on_write_tool(tool_name, arguments)
+
+        cached_content = try_cache_read(tool_name, arguments)
+        if cached_content is not None:
+            tool_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": str(tc_id),
+                    "content": cached_content,
+                }
+            )
+            continue
+
         result: Any
         try:
             result = mgr.call_tool(server, tool_name, arguments)
@@ -90,11 +108,13 @@ def run_tool_calls_with_harness_filter(
                         tool_name=tool_name,
                     )
 
+        content = serialize_tool_result(result)
+        record_read_result(tool_name, arguments, content)
         tool_messages.append(
             {
                 "role": "tool",
                 "tool_call_id": str(tc_id),
-                "content": serialize_tool_result(result),
+                "content": content,
             }
         )
 

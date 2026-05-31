@@ -138,6 +138,13 @@ def parse_args() -> argparse.Namespace:
         help="略過任務結束後的 MCP 事後驗證（除錯用；預設每任務獨立驗證 Editor 現場）",
     )
     parser.add_argument(
+        "--verification-max-tool-rounds",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Harness 事後驗證 MCP loop 上限（預設 build_goals.yaml 的 verification_max_tool_rounds，否則同 max_tool_rounds）",
+    )
+    parser.add_argument(
         "--no-autostart-mcp-server",
         action="store_true",
         help="勿自動啟動 Unity-MCP-Server（HTTP 須已在本機運行）",
@@ -280,20 +287,25 @@ def main() -> None:
 
     require_aicentral_config()
     try:
+        from core.harness_log import log_prepare_phase
+        from core.progress_hooks import harness_progress_hooks
+
         specs = resolve_server_specs(config_path=args.unity_config)
-        prepared = prepare_harness_queue(
-            goals_path=args.goals,
-            skip_plan_normalize=args.skip_plan_normalize,
-            replan=plan_cli.need_replan,
-            init_tasks=False,
-            write_back_goals=plan_cli.write_back_in_prepare,
-            backup_goals=args.backup,
-            plan_with_mcp=args.plan_with_mcp,
-            plan_interactive=args.plan_interactive,
-            supplements_path=args.supplements,
-            unity_config_path=args.unity_config,
-            specs=specs,
-        )
+        log_prepare_phase("載入 build_goals / Plan Normalize / bootstrap task_list")
+        with harness_progress_hooks():
+            prepared = prepare_harness_queue(
+                goals_path=args.goals,
+                skip_plan_normalize=args.skip_plan_normalize,
+                replan=plan_cli.need_replan,
+                init_tasks=False,
+                write_back_goals=plan_cli.write_back_in_prepare,
+                backup_goals=args.backup,
+                plan_with_mcp=args.plan_with_mcp,
+                plan_interactive=args.plan_interactive,
+                supplements_path=args.supplements,
+                unity_config_path=args.unity_config,
+                specs=specs,
+            )
         plan = prepared.build_plan
         task_list_path = prepared.task_list_path
         if task_list_path.is_file():
@@ -356,6 +368,12 @@ def main() -> None:
         return
 
     register_unity_servers(specs, config_path=args.unity_config)
+
+    if args.verification_max_tool_rounds is not None:
+        if args.verification_max_tool_rounds < 1:
+            print("錯誤: --verification-max-tool-rounds 須 >= 1", file=sys.stderr)
+            sys.exit(2)
+        execution_plan.verification_max_tool_rounds = args.verification_max_tool_rounds
 
     try:
         with UnityMcpServerSession(

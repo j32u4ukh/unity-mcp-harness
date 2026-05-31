@@ -13,6 +13,7 @@ from core.harness_log import (
     log_mcp_tool,
 )
 from core.mcp.filtered_orchestrator import run_tool_calls_with_harness_filter
+from core.mcp.read_cache import clear_read_cache, reset_read_cache
 
 
 @contextmanager
@@ -24,7 +25,7 @@ def harness_progress_hooks() -> Iterator[None]:
 
     orig_complete = orch.complete_with_mcp_loop
     orig_run_tool_calls = orch.run_tool_calls
-    orig_invoke = router.invoke_resolved
+    orig_invoke = orch.invoke_resolved
     orig_call_tool = mgr_mod.MCPManager.call_tool
 
     llm_round = [0]
@@ -32,8 +33,32 @@ def harness_progress_hooks() -> Iterator[None]:
 
     def logged_invoke_resolved(*args: Any, **kwargs: Any) -> Any:
         llm_round[0] += 1
-        log_llm_request(llm_round[0])
-        return orig_invoke(*args, **kwargs)
+        round_no = llm_round[0]
+        resolved = args[0] if args else None
+        provider = getattr(resolved, "provider", "") or ""
+        if kwargs.get("response_format"):
+            mode_hint = "json"
+        elif kwargs.get("tools"):
+            mode_hint = "tool"
+        else:
+            mode_hint = "chat"
+        log_llm_request(round_no)
+        if provider:
+            from core.harness_log import harness_log
+
+            harness_log(f"  （provider={provider}，mode={mode_hint}）")
+        result = orig_invoke(*args, **kwargs)
+        tool_count = 0
+        if isinstance(result, dict):
+            try:
+                message = result["choices"][0]["message"]
+                tool_calls = message.get("tool_calls")
+                if isinstance(tool_calls, list):
+                    tool_count = len(tool_calls)
+            except (KeyError, IndexError, TypeError):
+                pass
+        log_llm_round(llm_round[0], tool_count=tool_count)
+        return result
 
     def logged_call_tool(
         self: Any,
@@ -89,7 +114,7 @@ def harness_progress_hooks() -> Iterator[None]:
     ) -> Any:
         llm_round[0] = 0
         log_agent_start(model=model, max_tool_rounds=max_tool_rounds)
-        router.invoke_resolved = logged_invoke_resolved
+        reset_read_cache()
         try:
             return orig_complete(
                 messages,
@@ -99,15 +124,16 @@ def harness_progress_hooks() -> Iterator[None]:
                 **kwargs,
             )
         finally:
-            router.invoke_resolved = orig_invoke
+            clear_read_cache()
 
     mgr_mod.MCPManager.call_tool = logged_call_tool
     orch.complete_with_mcp_loop = logged_complete_with_mcp_loop
     orch.run_tool_calls = logged_run_tool_calls
+    orch.invoke_resolved = logged_invoke_resolved
     try:
         yield
     finally:
         mgr_mod.MCPManager.call_tool = orig_call_tool
         orch.complete_with_mcp_loop = orig_complete
         orch.run_tool_calls = orig_run_tool_calls
-        router.invoke_resolved = orig_invoke
+        orch.invoke_resolved = orig_invoke

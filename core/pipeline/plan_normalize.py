@@ -7,13 +7,19 @@ import logging
 import re
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from aicentral import Chat
 from aicentral.core.errors import StructuredNoPayloadError, StructuredValidationError
 from aicentral.exceptions import ProviderError
 
 from core.pipeline.schema import HarnessHints, NormalizedPlan, NormalizedTask, TaskTarget
+from core.harness_log import (
+    log_plan_normalize_fallback,
+    log_plan_normalize_llm_attempt,
+    log_plan_normalize_llm_done,
+    log_plan_normalize_start,
+)
 from tasks import BuildPlan, BuildTask
 from unity_common import resolve_unity_llm_model
 
@@ -31,9 +37,16 @@ PLAN_NORMALIZE_SYSTEM = """你是 Unity MCP Harness 的規劃器（Plan Normaliz
    - 明確 Phase：先讀現場(Phase1) → 再寫入(Phase2) → 再讀驗證(Phase3)
    - 遵守 system_context 中的 2D 憲法（禁止 MeshRenderer 改色等）
 4. priority：整數，越小越先執行。
-5. harness（建議）：pre_read / post_read 簡短提示（唯讀 MCP 或 C# 片段）。
+5. harness（**必填**）：
+   - pre_read / post_read：Agent Phase 1/3 唯讀提示（簡短）
+   - verify_read：**Harness 事後驗證專用** MCP 預算（至多 2 次 tool 回合；優先單次 gameobject-find；禁止空 componentRef）
 6. plan_source_id：若由藍圖粗任務拆分，填寫粗任務 id；否則與 id 相同。
 7. target（可選）：game_object、scene_path。
+
+## 驗證 MCP 預算（寫入 harness.verify_read）
+- 標準任務：先 find(includeComponents+includeData)，必要時至多 1 次 component-get（須含 instanceID），然後輸出 JSON。
+- 冪等「已存在，跳過」：僅 1 次 find 確認存在即可。
+- 禁止冗餘 object-get-data、禁止對同一 instanceID 重複讀取。
 
 ## 規則
 - 可將少量粗任務拆成多條可執行子任務（例如 3 條 → 6 條），順序符合依賴。
@@ -57,11 +70,37 @@ _HARNESS_COT_BLOCK = """
 class _HarnessHintsOut(BaseModel):
     pre_read: str | None = None
     post_read: str | None = None
+    verify_read: str | None = None
+
+    @field_validator("pre_read", "post_read", "verify_read", mode="before")
+    @classmethod
+    def _coerce_optional_str(cls, value: Any) -> Any:
+        if value is None or value == "":
+            return None
+        return value
 
 
 class _TaskTargetOut(BaseModel):
     game_object: str | None = None
     scene_path: str | None = None
+
+    @field_validator("game_object", "scene_path", mode="before")
+    @classmethod
+    def _coerce_optional_str(cls, value: Any) -> Any:
+        if value is None or value == "":
+            return None
+        return value
+
+
+def _coerce_optional_nested_object(value: Any) -> Any:
+    """LLM 常回傳 null / 空字串 / 非物件；略過以免整批驗證失敗。"""
+    if value is None or value == "" or value == {}:
+        return None
+    if isinstance(value, str):
+        return None
+    if isinstance(value, dict):
+        return value
+    return None
 
 
 class NormalizedTaskOut(BaseModel):
@@ -75,9 +114,30 @@ class NormalizedTaskOut(BaseModel):
     target: _TaskTargetOut | None = None
     expected: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("harness", "target", mode="before")
+    @classmethod
+    def _coerce_nested(cls, value: Any) -> Any:
+        return _coerce_optional_nested_object(value)
+
+    @field_validator("title", "plan_source_id", mode="before")
+    @classmethod
+    def _coerce_optional_str(cls, value: Any) -> Any:
+        if value is None or value == "":
+            return None
+        return value
+
+    @field_validator("expected", mode="before")
+    @classmethod
+    def _coerce_expected(cls, value: Any) -> Any:
+        if value is None or value == "":
+            return {}
+        if isinstance(value, dict):
+            return value
+        return {}
+
 
 class PlanNormalizeResponse(BaseModel):
-    normalized_tasks: list[NormalizedTaskOut]
+    normalized_tasks: list[NormalizedTaskOut] = Field(min_length=1)
     plan_changelog: str = ""
 
 
@@ -88,15 +148,28 @@ def _ensure_harness_cot(prompt: str) -> str:
     return body + "\n" + _HARNESS_COT_BLOCK
 
 
+def _finalize_normalized_task(task: NormalizedTask) -> NormalizedTask:
+    from core.pipeline.verify_hints import (
+        apply_verify_hints_to_normalized_tasks,
+        ensure_agent_read_hint_in_prompt,
+    )
+
+    task.prompt = ensure_agent_read_hint_in_prompt(task.prompt)
+    apply_verify_hints_to_normalized_tasks([task])
+    return task
+
+
 def _task_from_build(task: BuildTask, *, priority: int) -> NormalizedTask:
     description = task.objective.strip() or task.title
-    return NormalizedTask(
-        id=task.id,
-        description=description,
-        title=task.title,
-        prompt=_ensure_harness_cot(task.prompt),
-        priority=priority,
-        plan_source_id=task.id,
+    return _finalize_normalized_task(
+        NormalizedTask(
+            id=task.id,
+            description=description,
+            title=task.title,
+            prompt=_ensure_harness_cot(task.prompt),
+            priority=priority,
+            plan_source_id=task.id,
+        )
     )
 
 
@@ -121,6 +194,7 @@ def _task_from_out(item: NormalizedTaskOut) -> NormalizedTask:
         harness = HarnessHints(
             pre_read=item.harness.pre_read,
             post_read=item.harness.post_read,
+            verify_read=item.harness.verify_read,
         )
     target = TaskTarget()
     if item.target:
@@ -128,16 +202,18 @@ def _task_from_out(item: NormalizedTaskOut) -> NormalizedTask:
             game_object=item.target.game_object,
             scene_path=item.target.scene_path,
         )
-    return NormalizedTask(
-        id=item.id.strip(),
-        description=item.description.strip(),
-        prompt=_ensure_harness_cot(item.prompt),
-        priority=int(item.priority),
-        title=item.title,
-        target=target,
-        expected=dict(item.expected or {}),
-        harness=harness,
-        plan_source_id=item.plan_source_id or item.id,
+    return _finalize_normalized_task(
+        NormalizedTask(
+            id=item.id.strip(),
+            description=item.description.strip(),
+            prompt=_ensure_harness_cot(item.prompt),
+            priority=int(item.priority),
+            title=item.title,
+            target=target,
+            expected=dict(item.expected or {}),
+            harness=harness,
+            plan_source_id=item.plan_source_id or item.id,
+        )
     )
 
 
@@ -271,11 +347,24 @@ def normalize_plan(
     resolved_model = resolve_unity_llm_model(model or plan.model)
     session = chat or Chat.stateless(system=PLAN_NORMALIZE_SYSTEM, model=resolved_model)
 
+    log_plan_normalize_start(
+        model=resolved_model,
+        blueprint_tasks=len(plan.enabled_tasks()),
+        plan_revision=plan_revision,
+    )
+    log_plan_normalize_llm_attempt(mode="auto", attempt=1)
+
     try:
         result = session.complete_structured(
             user_prompt,
             response_model=PlanNormalizeResponse,
-            mode="json",
+            mode="auto",
+        )
+        if not result.normalized_tasks:
+            raise ValueError("LLM 回傳空任務列表")
+        log_plan_normalize_llm_done(
+            mode="auto",
+            task_count=len(result.normalized_tasks),
         )
         normalized = NormalizedPlan(
             normalized_tasks=[_task_from_out(t) for t in result.normalized_tasks],
@@ -283,8 +372,9 @@ def normalize_plan(
             plan_revision=plan_revision,
             source_plan="build_goals.yaml",
         )
-        if not normalized.normalized_tasks:
-            raise ValueError("LLM 回傳空任務列表")
+        from core.pipeline.verify_hints import apply_verify_hints_to_normalized_tasks
+
+        apply_verify_hints_to_normalized_tasks(normalized.normalized_tasks)
         return enrich_normalized_plan(
             plan,
             normalized,
@@ -298,6 +388,7 @@ def normalize_plan(
         StructuredNoPayloadError,
         StructuredValidationError,
     ) as exc:
+        log_plan_normalize_fallback(str(exc))
         _logger.warning("Plan Normalize LLM 失敗，改用 passthrough: %s", exc)
         fallback = normalize_plan_passthrough(plan, plan_revision=plan_revision)
         fallback.plan_changelog = f"LLM 規劃失敗（{exc}），已 passthrough"

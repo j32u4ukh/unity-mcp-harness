@@ -26,6 +26,10 @@ To prevent false-successes and hallucinations, verify the environment BEFORE cre
 ### CASE C: Tool returns normal data showing the object exists
 - Meaning: Idempotent skip candidate if it already matches task requirements.
 - Action: Report「已存在，跳過」when appropriate; do not duplicate.
+
+### CASE D: `"harness_cache_hit": true` in tool JSON
+- Meaning: Harness reused a prior read in this task MCP loop (same instanceID/target).
+- Action: Use `result` field; do NOT repeat the same find/component-get/object-get-data call.
 """
 
 ROUTE_TO_CREATE = "route_to_create"

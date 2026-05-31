@@ -33,6 +33,7 @@ class TaskTarget:
 class HarnessHints:
     pre_read: str | None = None
     post_read: str | None = None
+    verify_read: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> HarnessHints:
@@ -41,6 +42,7 @@ class HarnessHints:
         return cls(
             pre_read=data.get("pre_read"),
             post_read=data.get("post_read"),
+            verify_read=data.get("verify_read"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,6 +51,8 @@ class HarnessHints:
             out["pre_read"] = self.pre_read
         if self.post_read is not None:
             out["post_read"] = self.post_read
+        if self.verify_read is not None:
+            out["verify_read"] = self.verify_read
         return out
 
 

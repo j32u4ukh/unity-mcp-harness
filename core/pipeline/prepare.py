@@ -105,9 +105,12 @@ def prepare_harness_queue(
         )
         created = True
     else:
-        from core.pipeline.store import load_task_list
+        from core.pipeline.store import load_task_list, save_task_list
+        from core.pipeline.verify_hints import backfill_task_list_verify_hints
 
         task_list = load_task_list(task_path)
+        if backfill_task_list_verify_hints(task_list):
+            save_task_list(task_list, task_path)
         normalized = _normalized_from_task_list(task_list)
         created = False
 
