@@ -28,6 +28,7 @@ from core.cli_plan import (
     print_deprecation_notices,
     resolve_plan_cli,
 )
+from core.mcp.server_lifecycle import UnityMcpServerSession
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,7 +49,7 @@ def parse_args() -> argparse.Namespace:
         "--unity-config",
         type=str,
         default=None,
-        help="Unity MCP 設定 JSON（預設 unity_servers.json；無檔時 fallback HTTP :8080）",
+        help="Unity MCP 設定 JSON（預設 unity_servers.json；無檔時 fallback IvanMurzak HTTP :22172）",
     )
     parser.add_argument(
         "--continue-on-error",
@@ -106,9 +107,14 @@ def parse_args() -> argparse.Namespace:
         help="與 --init 合用：覆寫已存在的非機密檔（含 secret.yaml，請謹慎）",
     )
     parser.add_argument(
+        "--init-stdio",
+        action="store_true",
+        help="與 --init 合用：使用 Coplay stdio relay 範本（預設 IvanMurzak HTTP）",
+    )
+    parser.add_argument(
         "--init-http",
         action="store_true",
-        help="與 --init 合用：使用 HTTP MCP 範本建立 unity_servers.json（預設 stdio）",
+        help="（已為預設）與 --init 合用：使用 IvanMurzak HTTP MCP 範本",
     )
     parser.add_argument(
         "--bootstrap-state",
@@ -125,6 +131,11 @@ def parse_args() -> argparse.Namespace:
         "--skip-verification",
         action="store_true",
         help="略過任務結束後的 MCP 事後驗證（除錯用；預設每任務獨立驗證 Editor 現場）",
+    )
+    parser.add_argument(
+        "--no-autostart-mcp-server",
+        action="store_true",
+        help="勿自動啟動 Unity-MCP-Server（HTTP 須已在本機運行）",
     )
     add_harness_llm_config_args(parser)
     return parser.parse_args()
@@ -197,7 +208,7 @@ def main() -> None:
         from core.scaffold.init_workspace import format_init_report, init_workspace
 
         target = Path.cwd() if args.init == "" else Path(args.init)
-        transport = "http" if args.init_http else "stdio"
+        transport = "stdio" if args.init_stdio else "http"
         report = init_workspace(
             target,
             force=args.init_force,
@@ -322,16 +333,20 @@ def main() -> None:
     register_unity_servers(specs, config_path=args.unity_config)
 
     try:
-        results = run_build_plan(
-            execution_plan,
-            specs=specs,
-            unity_config_path=args.unity_config,
-            stop_on_error=not args.continue_on_error,
-            task_list=task_list,
-            task_list_path=task_list_path,
-            resume=resume,
-            skip_verification=args.skip_verification,
-        )
+        with UnityMcpServerSession(
+            specs,
+            autostart=not args.no_autostart_mcp_server,
+        ):
+            results = run_build_plan(
+                execution_plan,
+                specs=specs,
+                unity_config_path=args.unity_config,
+                stop_on_error=not args.continue_on_error,
+                task_list=task_list,
+                task_list_path=task_list_path,
+                resume=resume,
+                skip_verification=args.skip_verification,
+            )
     except Exception as exc:
         handle_errors(exc)
         sys.exit(1)

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from core.mcp.server_lifecycle import specs_for_aicentral
 from unity_common import (
     ENV_AICENTRAL_HOME,
     ENV_PROJECT_HOME,
@@ -69,7 +70,8 @@ def test_resolve_unity_llm_model_default(_mock_eff: MagicMock) -> None:
 def test_default_server_spec() -> None:
     specs = default_server_spec()
     assert "unity" in specs
-    assert specs["unity"]["url"] == "http://localhost:8080/mcp"
+    assert specs["unity"]["url"] == "http://localhost:22172"
+    assert specs["unity"]["transport"] == "http"
 
 
 def test_load_server_specs_cursor_mcp_servers_wrapper(tmp_path: Path) -> None:
@@ -212,7 +214,7 @@ def test_bootstrap_uses_harness_config_dir(tmp_path: Path, monkeypatch: pytest.M
 def test_register_unity_servers(mock_reg: MagicMock) -> None:
     specs = default_server_spec()
     register_unity_servers(specs)
-    mock_reg.assert_called_once_with(specs)
+    mock_reg.assert_called_once_with(specs_for_aicentral(specs))
 
 
 @patch("unity_common.register_mcp_servers")

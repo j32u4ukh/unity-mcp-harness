@@ -14,6 +14,7 @@ from unity_common import (
     require_aicentral_config,
     resolve_server_specs,
 )
+from core.mcp.server_lifecycle import UnityMcpServerSession
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,7 +34,8 @@ def main() -> None:
 
     try:
         specs = resolve_server_specs(config_path=args.config) if args.config else resolve_server_specs()
-        tools_map = list_unity_tools(specs=specs, config_path=args.config)
+        with UnityMcpServerSession(specs):
+            tools_map = list_unity_tools(specs=specs, config_path=args.config)
     except Exception as exc:
         handle_errors(exc)
         sys.exit(1)

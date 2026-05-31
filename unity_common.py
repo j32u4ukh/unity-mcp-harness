@@ -17,6 +17,13 @@ from aicentral.exceptions import ProviderError
 from aicentral.mcp import MCPError
 from aicentral.routing.router import effective_model
 
+from core.mcp.server_lifecycle import (
+    UnityMcpServerError,
+    parse_http_endpoint,
+    resolve_unity_mcp_server_home,
+    specs_for_aicentral,
+)
+
 EXIT_COMMANDS = frozenset({"exit", "quit", "/exit", "/quit"})
 
 # aicentral.yaml model_list 別名（gemini_pools.default 輪換；需 config/secret.yaml 的 gemini.api_key）
@@ -24,7 +31,8 @@ DEFAULT_LLM_MODEL = "gemini-flash"
 
 # 單一 server 時的預設名稱與 URL（Coplay MCP for Unity 預設 HTTP）
 DEFAULT_SERVER_NAME = "unity"
-DEFAULT_UNITY_MCP_URL = "http://localhost:8080/mcp"
+DEFAULT_UNITY_MCP_PORT = 22172
+DEFAULT_UNITY_MCP_URL = f"http://localhost:{DEFAULT_UNITY_MCP_PORT}"
 
 # 本專案目錄下的設定檔（複製 example 後修改，勿提交含機密的 json）
 LOCAL_SERVERS_FILE = "unity_servers.json"
@@ -154,15 +162,56 @@ def default_server_spec(
     url: str = DEFAULT_UNITY_MCP_URL,
     name: str = DEFAULT_SERVER_NAME,
 ) -> dict[str, dict[str, Any]]:
-    """單一 Unity MCP（HTTP）的預設規格。"""
-    return {
-        name: {
-            "transport": "http",
-            "url": url,
-            "auth_type": "none",
-            "description": "Unity MCP（執行期註冊）",
-        }
+    """單一 Unity MCP（IvanMurzak HTTP）的預設規格；含 autostart（若可解析 Server 目錄）。"""
+    _, port, _ = parse_http_endpoint(url)
+    entry: dict[str, Any] = {
+        "transport": "http",
+        "url": url,
+        "auth_type": "none",
+        "description": "IvanMurzak Unity-MCP-Server（Streamable HTTP）",
     }
+    home = resolve_unity_mcp_server_home()
+    if home:
+        entry["autostart"] = {
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--",
+                f"--port={port}",
+                "--client-transport=streamableHttp",
+            ],
+            "cwd": home.replace("\\", "/"),
+            "ready_timeout_sec": 90,
+        }
+    return {name: entry}
+
+
+def ivanmurzak_server_entry(
+    *,
+    port: int = DEFAULT_UNITY_MCP_PORT,
+    server_home: str | None = None,
+) -> dict[str, Any]:
+    """建立 IvanMurzak ``unity_servers.json`` 單一 server 項目（供範本與 init）。"""
+    home = server_home or resolve_unity_mcp_server_home() or ""
+    entry: dict[str, Any] = {
+        "transport": "http",
+        "url": f"http://localhost:{port}",
+        "auth_type": "none",
+        "description": "IvanMurzak Unity-MCP-Server（Streamable HTTP；port 須與 Unity Plugin 一致）",
+    }
+    if home:
+        entry["autostart"] = {
+            "command": "dotnet",
+            "args": [
+                "run",
+                "--",
+                f"--port={port}",
+                "--client-transport=streamableHttp",
+            ],
+            "cwd": home.replace("\\", "/"),
+            "ready_timeout_sec": 90,
+        }
+    return entry
 
 
 def _normalize_server_specs(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -213,9 +262,19 @@ def format_mcp_prerequisites(specs: dict[str, dict[str, Any]]) -> list[str]:
             )
         elif transport in ("http", "sse"):
             url = entry.get("url", "?")
+            autostart = entry.get("autostart")
+            home = os.environ.get("UNITY_MCP_SERVER_HOME", "").strip()
             lines.append(
-                f"  • [{name}] {transport}：Unity 內已啟動 MCP HTTP/SSE（{url}）"
+                f"  • [{name}] {transport}：Unity-MCP-Server 須在 {url} 監聽"
             )
+            if autostart or home:
+                lines.append(
+                    f"    （Harness 可在 port 未開時 autostart；見 docs/IvanMurzak-Unity-MCP.md）"
+                )
+            else:
+                lines.append(
+                    "    （執行前須先啟動 Unity-MCP-Server，否則 Connection refused）"
+                )
         else:
             lines.append(f"  • [{name}] transport={transport}")
     lines.append("  • LLM 需支援 function calling（MCP tool loop）")
@@ -318,8 +377,11 @@ def register_unity_servers(
 ) -> dict[str, MCPServerEntry]:
     """執行期註冊一至多個 Unity MCP Server（不寫入 aicentral.yaml）。"""
     resolved = specs if specs is not None else resolve_server_specs(config_path=config_path)
-    register_mcp_servers(resolved)
-    return {name: MCPServerEntry.model_validate(entry) for name, entry in resolved.items()}
+    register_mcp_servers(specs_for_aicentral(resolved))
+    return {
+        name: MCPServerEntry.model_validate(entry)
+        for name, entry in specs_for_aicentral(resolved).items()
+    }
 
 
 def registered_server_names(
@@ -428,7 +490,7 @@ def add_unity_mcp_config_arg(parser: Any) -> None:
         type=str,
         default=None,
         metavar="PATH",
-        help="Unity MCP 設定 JSON（預設 unity_servers.json；無檔時 fallback HTTP :8080）",
+        help="Unity MCP 設定 JSON（預設 unity_servers.json；無檔時 fallback IvanMurzak HTTP :22172）",
     )
 
 
@@ -472,7 +534,9 @@ def print_banner(
 
 
 def handle_errors(exc: BaseException) -> None:
-    if isinstance(exc, MCPError):
+    if isinstance(exc, UnityMcpServerError):
+        print(f"Unity MCP Server: {exc}", file=sys.stderr)
+    elif isinstance(exc, MCPError):
         print(f"MCP 錯誤: {exc}", file=sys.stderr)
     elif isinstance(exc, ProviderError):
         print(f"LLM 錯誤: {exc}", file=sys.stderr)

@@ -9,7 +9,7 @@
 ```
 build_goals.yaml  →  tasks.py（組 prompt）
        ↓
-build_workflow.py / unity-mcp-build  →  harness.mcp_runner.UnityMCPRunner
+build_workflow.py / unity-mcp-harness  →  harness.mcp_runner.UnityMCPRunner
        ↓
 aicentral Chat.with_mcp + MCP tool loop
        ↓
@@ -17,6 +17,8 @@ unity_servers.json 註冊的 transport（stdio relay / http）
        ↓
 Unity Editor（MCP for Unity）
 ```
+
+**IvanMurzak HTTP 路線**：Agent 只連本機 `Unity-MCP-Server`（Streamable HTTP）；Server 須**先**在背景監聽 port，否則 Harness 會收到 Connection refused。見 [IvanMurzak-Unity-MCP.md](./IvanMurzak-Unity-MCP.md)（含 autostart 與 `UNITY_MCP_SERVER_HOME`）。
 
 - **aicentral**：LLM 路由 + MCP orchestrator（`complete_with_mcp_loop`）。
 - **aicentral-agent**：通用 LangGraph / `ChatAicentral`（不含 Unity MCP）。
