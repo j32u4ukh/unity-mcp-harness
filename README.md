@@ -46,28 +46,27 @@ $env:UNITY_MCP_HOME = (Get-Location).Path
 
 詳見 [docs/EXTERNAL_PROJECT.md](docs/EXTERNAL_PROJECT.md)。
 
-### 2. Unity MCP
+### 2. Unity MCP（IvanMurzak）
 
-複製連線設定到 **`unity_servers.json`**（已 gitignore），檔名須與 `build_goals.yaml` 的 `mcp_servers` 一致（預設 `unity`）。
+預設使用 **[IvanMurzak/Unity-MCP](docs/IvanMurzak-Unity-MCP.md)**（Streamable HTTP + Harness autostart）。`unity_servers.json` 已含 `autostart`；Harness 在 port 未開時會自動 `dotnet run` Unity-MCP-Server。
 
-**stdio + relay（本專案預設）** — 複製 `unity_servers.stdio.example.json` 或使用下列內容寫入 `unity_servers.json`：
-
-```json
-{
-  "unity": {
-    "transport": "stdio",
-    "command": "C:\\Users\\PC\\.unity\\relay\\relay_win.exe",
-    "args": ["--mcp"],
-    "auth_type": "none"
-  }
-}
+```powershell
+# 編輯 config\local.env.ps1：Unity 專案路徑 + UNITY_MCP_SERVER_HOME
+. .\scripts\_env.ps1
+unity-mcp-list-tools --json   # 應列出 kebab-case 工具（如 assets-find）
 ```
 
-前置：Unity Editor **已開啟**，MCP 外掛已連上 relay（Named Pipe）。驗證：`unity-mcp-list-tools --json`。
+前置：
 
-**HTTP（可選）** — 複製 `unity_servers.example.json`；須在 Unity 內啟動 MCP Server（例如 `http://localhost:8080/mcp`）。Cursor 若用 HTTP 可參考 [docs/cursor-mcp.http.example.json](docs/cursor-mcp.http.example.json)。
+1. Unity 專案已安裝 **IvanMurzak Unity-MCP Plugin**，Plugin port 與 json 一致（預設 **22172**）
+2. `config/local.env.ps1` 設好 `$UnityMcpServerHome`（或 json `autostart.cwd`）
+3. Unity Editor **已開啟**且 Plugin 已連上 Server
 
-**Cursor IDE**：`%USERPROFILE%\.cursor\mcp.json` 可與上列 stdio（`command`/`args`）或 HTTP（`url`）擇一；**Harness CLI** 一律讀本專案 `unity_servers.json`（aicentral 格式，含 `transport`）。
+手動常駐 Server（可選）：`.\scripts\start-unity-mcp-server.ps1`
+
+**Coplay stdio relay（舊）** — 複製 `unity_servers.stdio.example.json`；見 [docs/NOTE.md](docs/NOTE.md)。
+
+**Cursor IDE**：`%USERPROFILE%\.cursor\mcp.json` 可設 `"url": "http://localhost:22172"`；Harness CLI 讀工作區 `unity_servers.json`。
 
 ### 3. 多任務建構（主要流程）
 

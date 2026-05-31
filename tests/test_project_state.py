@@ -35,11 +35,15 @@ def test_record_task_completion_updates_files(
     task = HarnessTask(
         id="inspect_scene",
         description="檢視場景",
-        status="in_progress",
+        status="completed",
+        verification="verified",
         priority=10,
         prompt="list hierarchy",
         target=TaskTarget(scene_path="Assets/Scenes/Demo.unity"),
     )
+    task.pipeline_records.actual_after = {
+        "harness_verification": {"verified": True, "summary": "場景 Demo，含 Ground"}
+    }
     result = TaskResult(
         id="inspect_scene",
         title="檢視場景",
@@ -49,14 +53,16 @@ def test_record_task_completion_updates_files(
     record_task_completion(task, result)
 
     root = default_project_state_root()
-    assert (root / "tasks" / "inspect_scene.md").is_file()
+    task_md = (root / "tasks" / "inspect_scene.md").read_text(encoding="utf-8")
+    assert "## 當前狀態" in task_md
+    assert "## 任務 inspect_scene" not in task_md
     assert (root / "changelog.md").read_text(encoding="utf-8").find("inspect_scene") >= 0
 
     index = load_index(root)
     assert index is not None
     entry = index.find("tasks/inspect_scene")
     assert entry is not None
-    assert "Ground" in entry.summary or "Demo" in entry.summary
+    assert "verified" in entry.summary or "Ground" in entry.summary
 
 
 def test_format_project_state_for_task(tmp_path: Path, monkeypatch) -> None:
@@ -76,8 +82,8 @@ def test_format_project_state_for_task(tmp_path: Path, monkeypatch) -> None:
     )
 
     text = format_project_state_for_task(task)
-    assert "project_state" in text or "累積備忘" in text
-    assert "add_light" in text or "Directional" in text
+    assert "task_list" in text or "SSOT" in text or "輔助" in text
+    assert "add_light" in text or "Directional" in text or "當前狀態" in text
 
 
 def test_format_project_state_for_planning_empty_without_init(tmp_path: Path, monkeypatch) -> None:
@@ -99,6 +105,7 @@ def test_session_buffers_until_flush(tmp_path: Path, monkeypatch) -> None:
                     id=tid,
                     description=tid,
                     status="completed",
+                    verification="verified",
                     priority=10,
                     prompt="p",
                 ),

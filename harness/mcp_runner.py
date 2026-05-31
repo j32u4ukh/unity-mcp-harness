@@ -8,6 +8,16 @@ from typing import Any
 from aicentral import Chat
 
 
+def compose_unity_agent_system(extra: str | None = None) -> str:
+    """Harness 預設 system prompt（含 Unity Observer 協議）+ 可選自訂段落。"""
+    from core.prompts.unity_observer_protocol import UNITY_OBSERVER_PROTOCOL
+
+    parts = [UNITY_OBSERVER_PROTOCOL.strip()]
+    if extra and str(extra).strip():
+        parts.append(str(extra).strip())
+    return "\n\n".join(parts)
+
+
 class UnityMCPRunner:
     """封裝已啟用 MCP 的 aicentral ``Chat`` 工作階段（供多輪建構任務共用）。"""
 
@@ -41,7 +51,7 @@ def create_unity_mcp_runner(
     chat = Chat.with_mcp(
         servers,
         model=resolve_unity_llm_model(model),
-        system=system,
+        system=compose_unity_agent_system(system),
         max_tool_rounds=max_tool_rounds,
         include_tool_messages_in_history=include_tool_messages_in_history,
     )

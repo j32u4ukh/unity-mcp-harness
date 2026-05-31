@@ -41,8 +41,10 @@ def _flush_delta_to_disk(root: Path, delta: TaskStateDelta) -> None:
     for append in delta.markdown_appends:
         mpath = root / append.rel_path
         mpath.parent.mkdir(parents=True, exist_ok=True)
-        if mpath.is_file():
-            content = mpath.read_text(encoding="utf-8") + append.block
+        if append.full_replace_content is not None:
+            mpath.write_text(append.full_replace_content, encoding="utf-8")
+        elif mpath.is_file():
+            mpath.write_text(mpath.read_text(encoding="utf-8") + append.block, encoding="utf-8")
         else:
             title = append.create_title or mpath.stem.replace("_", " ").title()
             content = (
@@ -50,7 +52,7 @@ def _flush_delta_to_disk(root: Path, delta: TaskStateDelta) -> None:
                 "> 由 Harness 任務完成後增量更新；非 ground truth。\n"
                 + append.block
             )
-        mpath.write_text(content, encoding="utf-8")
+            mpath.write_text(content, encoding="utf-8")
 
     save_index(index, root)
 

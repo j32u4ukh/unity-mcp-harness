@@ -19,14 +19,18 @@ UNITY_MCP_HOME/
 
 與 Unity 遊戲專案（`config/local.env.ps1` 內路徑）**分離**；不寫入 `Assets/`。
 
-## 與 task_list.yaml 的分工
+## 與 task_list.yaml 的分工（SSOT 優先序）
 
-| 檔案 | 內容 | 更新時機 |
-|------|------|----------|
-| `task_list.yaml` | 任務隊列、status、verification、`pipeline_records` | 任務開始/結束（細粒度執行紀錄） |
-| `project_state/` | 跨任務可讀的專案現況摘要（Markdown + 索引） | 任務**完成**後增量追加 |
+| 來源 | 角色 |
+|------|------|
+| `task_list.yaml` | **執行 SSOT**：status、verification、`pipeline_records` / `harness_verification` |
+| `project_state/` | **對外摘要**：`tasks/<id>.md` 的 `## 當前狀態`、`_index.yaml`、`## 當前快照` overview |
+| `changelog.md` | 稽核流水（追加，不刪舊行） |
+| `--bootstrap-state` MCP 盤點 | 場景/資產基線快照（可選） |
 
-規劃（Plan Normalize）與執行（`format_task_prompt`）會注入 `project_state` 摘要，並搭配 `task_list` 的 Harness 上下文。
+**原則**：僅 `status=completed` 且 `verification` 為 `verified` / `skipped_by_idempotent` 才可視為藍圖子項已完成。`failed` / `pending` 必須出現在規劃輸入中；Agent 樂觀回覆僅能作「未採信」附註，不得寫入索引主摘要。
+
+規劃（Plan Normalize）會注入 **task_list SSOT 表** + 同步後的 `project_state` 索引；與 SSOT 衝突的備忘一律忽略。
 
 ## 建立
 
@@ -51,14 +55,33 @@ unity-mcp-harness --bootstrap-state
 
 建議順序：`--init` → 編輯設定 → `--bootstrap-state` → 編輯 `build_goals.yaml` → `harness-dry-run --replan` → `harness-run`。
 
+## 同步與修剪（`--sync-project-state`）
+
+依 `task_list.yaml` 重建 `project_state`（修剪舊 `## 任務 …` 章節，只保留標題 + `## 當前狀態` + changelog 稽核）：
+
+```powershell
+unity-mcp-harness --sync-project-state
+```
+
+**自動同步時機**：
+
+- `prepare_harness_queue` 載入/建立 `task_list` 後
+- `run_build_plan` 結束 `end_session(flush=True)` 後全量校正 index/overview
+
+**修復過期備忘現場**（例如 Normalize 誤判已完成）：
+
+1. `--sync-project-state`
+2. 可選：`--bootstrap-state` 刷新場景 `## 當前快照`
+3. `--goals-to-task-list` 或 `--replan` 檢查隊列是否仍含 `failed` / `pending`
+
 ## 更新規則
 
-- **增量**：每任務完成追加 `tasks/<id>.md` 章節、更新 overview、寫入 `changelog.md`、更新 `_index.yaml`
-- **記憶體緩衝**：`unity-mcp-harness` 整輪建構（`run_build_plan`）期間，更新先累積於 `ProjectStateSession`；**執行完成或中斷**時於 `finally` 一次 `flush` 落盤，減少每任務磁碟 IO
-- **同輪後續任務**可透過記憶體索引與待寫入區塊取得最新摘要（無需等 flush）
-- **非 ground truth**：標註於 prompt；Agent 仍須 Phase 1 MCP 讀取
-- **失敗任務**也會記錄（status: failed），供後續規劃參考
+- **任務檔**：每任務結束**覆寫** `tasks/<id>.md` 的 `## 當前狀態`（由 SSOT 摘要生成，非無限追加 `## 任務`）
+- **changelog**：仍追加一行（稽核）
+- **索引 / overview 快照**：全量 sync 或建構結束時依 verified 任務彙整 `## 當前快照`
+- **記憶體緩衝**：整輪建構期間先累積於 `ProjectStateSession`，`finally` flush 後再全量 sync 校正
+- **失敗任務**：索引摘要含 `failed`，不以 Agent「已成功」為主語
 
 ## 手動編輯
 
-可編輯 `scenes/_overview.md` 等補充說明；下次任務完成會**追加**章節，不會整檔覆寫（除非刪除檔案後由任務重建）。
+可編輯 overview 的 `## 當前快照` 補充說明；下次 `--sync-project-state` 或建構結束 sync 會依 task_list 覆寫快照區塊。`changelog.md` 僅追加、不自動刪行。

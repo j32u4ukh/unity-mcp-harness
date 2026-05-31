@@ -19,6 +19,8 @@
 | `--replan-and-run` | 同上，然後執行 pending 任務 | 是 |
 | （無旗標，已有 `task_list`） | 只執行隊列，**不**自動重讀藍圖 | 是 |
 
+**順序阻擋**：若依 priority 排序的前置任務為 `failed`，後續 `pending` / `in_progress` **不會執行**，直到 `--retry-failed` 重試該 failed 項。`--continue-on-error` 僅影響**同一輪**內是否繼續（仍會略過 failed 跑後續）。
+
 ## 寫回 `build_goals.yaml`（勿混用）
 
 | 參數 | 資料來源 | 必須搭配 |
@@ -27,6 +29,20 @@
 | `--export-goals-from-task-list` | **`task_list` 規劃欄位** | 單獨指令即可（不需 LLM） |
 
 `--backup` 可與任一 export 合用（寫回前產生 `build_goals.yaml.bak`）。
+
+## 執行期日誌
+
+預設 **`unity-mcp-harness` 執行建構時**會即時輸出進度到 stderr（任務開始/結束、LLM 各輪、MCP tool 呼叫、Harness 驗證）：
+
+```powershell
+unity-mcp-harness
+# 含 MCP tool 回傳摘要
+unity-mcp-harness -v
+# 安靜模式（僅錯誤與最終摘要）
+unity-mcp-harness -q
+```
+
+環境變數：`HARNESS_VERBOSE=1`、`HARNESS_QUIET=1`。
 
 ## 常見流程
 

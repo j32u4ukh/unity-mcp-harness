@@ -9,7 +9,7 @@
 ```
 build_goals.yaml  →  tasks.py（組 prompt）
        ↓
-build_workflow.py / unity-mcp-build  →  harness.mcp_runner.UnityMCPRunner
+build_workflow.py / unity-mcp-harness  →  harness.mcp_runner.UnityMCPRunner
        ↓
 aicentral Chat.with_mcp + MCP tool loop
        ↓
@@ -17,6 +17,8 @@ unity_servers.json 註冊的 transport（stdio relay / http）
        ↓
 Unity Editor（MCP for Unity）
 ```
+
+**IvanMurzak HTTP 路線**：Agent 只連本機 `Unity-MCP-Server`（Streamable HTTP）；Server 須**先**在背景監聽 port，否則 Harness 會收到 Connection refused。見 [IvanMurzak-Unity-MCP.md](./IvanMurzak-Unity-MCP.md)（含 autostart 與 `UNITY_MCP_SERVER_HOME`）。
 
 - **aicentral**：LLM 路由 + MCP orchestrator（`complete_with_mcp_loop`）。
 - **aicentral-agent**：通用 LangGraph / `ChatAicentral`（不含 Unity MCP）。
@@ -101,12 +103,32 @@ README 曾把 Cursor 的 `mcpServers` 範例寫成「複製到 unity_servers.jso
 - **`failed`**：Agent 文字看似成功，但驗證未通過 → `status` 亦為 `failed`。
 - **`skipped_by_idempotent`**：Agent 宣稱跳過，且驗證確認目標已存在。
 - 除錯可暫時關閉：`unity-mcp-harness --skip-verification`，或任務 `expected.skip_harness_verification: true`。
+- **驗證 MCP 預算**：Plan Normalize 會為每任務寫入 `harness.verify_read`（至多 2 次 tool 回合、優先單次 `gameobject-find`）；`build_goals.yaml` 可設 `verification_max_tool_rounds`（預設與 `max_tool_rounds` 相同）。CLI：`--verification-max-tool-rounds N`。
+- 若見 `MCP tool loop 已達上限（max_tool_rounds=…）`：驗證 LLM 在限額內未輸出 JSON，常因重複 `component-get` / 空 `componentRef`；沿用既有 `task_list` 時 prepare 會自動 backfill `verify_read`。
 
 仍非 Unity C# 斷言；最終依驗證 LLM 是否正確使用 MCP。要更硬可再加專用 `validate_scene` 任務。
 
 ### 9. 沒有「部分達標」狀態
 
 workflow 每任務只有 **OK / FAIL**（+ 驗證結果），**不會**自動分級「有場景但缺燈光」。要分級驗收需另做工具查詢或專用驗證任務（如 `validate_scene`）。
+
+### 10. GameObject.Find「找不到」震碎 tool loop（IvanMurzak）
+
+**現象**：Agent 創建前先 `game-object-find`，場景中本來就沒有該物件時 Unity 拋 `Not found GameObject with name '…'`，MCP 回 JSON-RPC error，aicentral tool loop 中斷，Agent 誤以為通訊失敗。
+
+**現狀**：Harness 在 `core/mcp/filtered_orchestrator.py` 攔截此錯誤，降級為 JSON `status: expected_not_found`（含 `harness_next_action: route_to_create`），tool loop **不中断**。真實崩潰（NullReference、編譯錯誤等）封裝為 `system_fatal_error`（`route_to_self_correction`），仍回傳 tool message 供模型自我修正。
+
+**Agent 認知**：`harness/mcp_runner.compose_unity_agent_system()` 自動注入 `core/prompts/unity_observer_protocol.py`。LangGraph **task 圖**仍為 `run_task → 下一任務`；tool 級分流由 LLM 讀 JSON 決策，非另建 ToolNode 條件邊。
+
+**日誌**：`-v` 時 filtered 的 not-found 會顯示 `[filtered] expected_not_found`。
+
+### 10.1 單任務 MCP loop 唯讀快取（instanceID 級）
+
+**行為**：每次 `complete_with_mcp_loop`（單任務 Agent 或驗證回合）開始時重置。同一 loop 內對相同目標的重複 `gameobject-find` / `gameobject-component-get`（須含有效 `componentRef.instanceID`）/ `object-get-data` 會回傳 `harness_cache_hit` 包裝的快取結果，**不再呼叫 Unity**。
+
+**寫入**（`gameobject-create`、`script-execute`、`component-set` 等）會清空該 loop 快取。
+
+**日誌**：`[Harness Cache] 略過重複唯讀 MCP…` 或寫入後清除快取。
 
 ---
 
@@ -164,6 +186,23 @@ Error: Connection revoked. Go to Unity Editor > Project Settings > AI > Unity MC
 - 後續任務：因 `stop_on_error` 未執行
 
 **下一步（人工）**：Unity → Project Settings → AI → Unity MCP → 核准 / Auto-approve → 再跑 `unity-mcp-build`。若模型仍不調工具，於 yaml 加 `model: cloud-chat`。
+
+---
+
+## 10.2 腳本任務驗證（assets-find）
+
+- **腳本檔存在**與 **Player 已掛載腳本** 分開驗證；`ensure_*script*` 類任務的 `verify_read` 用 `t:Script <類別名>`，不以完整 `Assets/.../*.cs` 當 filter。
+- `task_list` 載入時會 `backfill` 升級過期的 `gameobject-find(PlayerController)` 驗證計畫。
+- `operations_executed` 的 `tool` 欄為 Harness 階段標籤（`harness:verification_mcp_loop` 等），非單一 MCP 工具名。
+
+## 10.1 project_state 與 task_list SSOT
+
+- **執行完成與否**以 `task_list.yaml` 的 `status` / `verification` 為準，不以 Agent 回覆或舊 `project_state` 章節為準。
+- `tasks/<id>.md` 僅保留 **`## 當前狀態`**（Harness 覆寫）；過期 `## 任務 …` 由 `--sync-project-state` 修剪。
+- Plan Normalize 會讀 **【執行隊列 SSOT】** 區塊；僅 `completed` + `verified` / `skipped_by_idempotent` 可省略藍圖子項。
+- 重大重試或備忘錯亂後：`unity-mcp-harness --sync-project-state`，必要時再 `--bootstrap-state`。
+
+詳見 [PROJECT_STATE.md](./PROJECT_STATE.md)。
 
 ---
 

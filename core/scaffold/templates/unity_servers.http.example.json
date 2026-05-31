@@ -1,14 +1,14 @@
 {
   "unity": {
     "transport": "http",
-    "url": "http://localhost:8080/mcp",
+    "url": "http://localhost:22172",
     "auth_type": "none",
-    "description": "預設 Unity 實例（MCP for Unity / 本機 HTTP）"
-  },
-  "unity_alt": {
-    "transport": "http",
-    "url": "http://localhost:8081/mcp",
-    "auth_type": "none",
-    "description": "第二個 Unity Editor 實例（不同 port）"
+    "description": "IvanMurzak Unity-MCP-Server（Streamable HTTP；port 須與 Unity Plugin 一致）",
+    "autostart": {
+      "command": "dotnet",
+      "args": ["run", "--", "--port=22172", "--client-transport=streamableHttp"],
+      "cwd": "C:/Users/PC/Documents/llm-server/Unity-MCP/Unity-MCP-Server",
+      "ready_timeout_sec": 90
+    }
   }
 }

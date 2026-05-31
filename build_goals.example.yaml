@@ -5,6 +5,8 @@ project: "示範專案 — 基礎場景"
 # LLM 別名（預設 gemini-flash；見 unity_common.DEFAULT_LLM_MODEL）
 # model: gemini-flash
 max_tool_rounds: 12
+# Harness 事後驗證（獨立 MCP 回合）上限；未設時預設與 max_tool_rounds 相同
+verification_max_tool_rounds: 10
 
 mcp_servers:
   - unity

@@ -432,4 +432,8 @@ def enrich_normalized_plan(
             normalized.plan_changelog = f"{normalized.plan_changelog}；{suffix}"
         else:
             normalized.plan_changelog = suffix
+
+    from core.pipeline.verify_hints import apply_verify_hints_to_normalized_tasks
+
+    apply_verify_hints_to_normalized_tasks(normalized.normalized_tasks)
     return normalized

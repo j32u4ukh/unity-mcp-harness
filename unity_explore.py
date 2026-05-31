@@ -9,11 +9,13 @@ from typing import Any
 
 import yaml
 
+from core.mcp.server_lifecycle import UnityMcpServerSession
 from unity_common import (
     list_unity_tools,
     project_root,
     register_unity_servers,
     registered_server_names,
+    resolve_server_specs,
 )
 
 DEFAULT_EXPLORE_CONFIG = "config/unity_explore.yaml"
@@ -98,11 +100,13 @@ def verify_unity_mcp_connection(
 
     回傳 ``{server_name: [tool, ...]}``。
     """
-    register_unity_servers(specs, config_path=config_path)
-    tools_map = list_unity_tools(specs=specs, config_path=config_path)
+    resolved = specs if specs is not None else resolve_server_specs(config_path=config_path)
+    with UnityMcpServerSession(resolved):
+        register_unity_servers(resolved, config_path=config_path)
+        tools_map = list_unity_tools(specs=resolved, config_path=config_path)
     total = sum(len(tools) for tools in tools_map.values())
     if total == 0:
-        names = ", ".join(registered_server_names(specs, config_path=config_path)) or "?"
+        names = ", ".join(registered_server_names(resolved, config_path=config_path)) or "?"
         print(
             f"Unity MCP 已連線但未取得任何工具（servers: {names}）。\n"
             "請確認 Unity Editor 已開啟、MCP 外掛已啟用，並執行 unity-mcp-list-tools --json 除錯。",

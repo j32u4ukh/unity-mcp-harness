@@ -14,11 +14,20 @@ from aicentral.mcp import MCPError
 
 from harness.mcp_runner import UnityMCPRunner, create_unity_mcp_runner
 
+from core.harness_log import (
+    harness_log,
+    log_prompt_excerpt,
+    log_task_end,
+    log_task_start,
+)
+from core.progress_hooks import harness_progress_hooks
 from core.pipeline.execution import get_next_runnable_task, harness_task_to_build_task, harness_tasks_by_id
 from core.pipeline.runner import HarnessTaskRunner
 from core.pipeline.schema import HarnessTask, TaskListDocument
 from core.pipeline.store import default_task_list_path
 from core.project_state import begin_session, end_session
+from core.project_state.paths import default_project_state_root
+from core.project_state.ssot import sync_project_state_from_task_list
 from tasks import BuildPlan, BuildTask, TaskResult, format_task_prompt
 from unity_common import (
     ask_unity,
@@ -29,7 +38,12 @@ from unity_common import (
 
 
 class BuildState(TypedDict):
-    """建構執行狀態（LangGraph）。"""
+    """建構執行狀態（LangGraph）。
+
+    注意：MCP tool 級別的 ``route_to_create`` / ``route_to_self_correction`` 由
+    ``core/mcp/tool_error_filter`` 在 aicentral tool loop 內以 JSON 分流，
+    不在此 StateGraph 另建 ToolNode 條件邊（單一 ``run_task`` 節點內含多輪 tool loop）。
+    """
 
     plan: BuildPlan
     task_index: int
@@ -50,8 +64,10 @@ def _run_single_task(
     harness_task: HarnessTask | None = None,
     resume: bool = False,
     pipeline_runner: HarnessTaskRunner | None = None,
+    task_index: int | None = None,
 ) -> TaskResult:
     """執行單一任務：UnityMCPRunner → aicentral Chat.with_mcp。"""
+    log_task_start(task.id, task.title, index=task_index)
     if pipeline_runner is not None:
         harness_task = pipeline_runner.on_task_start(task.id)
 
@@ -62,6 +78,7 @@ def _run_single_task(
         harness_task=harness_task,
         resume=resume,
     )
+    log_prompt_excerpt(prompt)
     try:
         if task.mcp_servers:
             reply = ask_unity(
@@ -88,6 +105,7 @@ def _run_single_task(
                 reply=reply,
             )
     except (MCPError, ProviderError) as exc:
+        harness_log(str(exc), level="ERROR")
         result = TaskResult(
             id=task.id,
             title=task.title,
@@ -97,7 +115,16 @@ def _run_single_task(
         )
 
     if pipeline_runner is not None:
-        pipeline_runner.on_task_end(task.id, result)
+        ht, result = pipeline_runner.on_task_end(task.id, result)
+        final_ok = ht.status == "completed"
+        log_task_end(
+            task.id,
+            success=final_ok,
+            verification=ht.verification,
+            error=result.error,
+        )
+    else:
+        log_task_end(task.id, success=result.success, error=result.error)
     return result
 
 
@@ -108,6 +135,8 @@ def _make_run_task_node(
     harness_by_id: dict[str, HarnessTask],
     resume: bool,
     pipeline_runner: HarnessTaskRunner | None = None,
+    stop_on_error: bool = True,
+    retry_failed: bool = False,
 ):
     """建立閉包節點：讀取 state 中當前 task_index 並執行。"""
 
@@ -116,7 +145,12 @@ def _make_run_task_node(
         task: BuildTask
         ht: HarnessTask | None
         if pipeline_runner is not None:
-            next_ht = get_next_runnable_task(pipeline_runner.document)
+            block_after_failed = stop_on_error
+            next_ht = get_next_runnable_task(
+                pipeline_runner.document,
+                retry_failed=retry_failed,
+                block_after_failed=block_after_failed,
+            )
             if next_ht is None:
                 return {"has_next": False}
             task = harness_task_to_build_task(next_ht)
@@ -138,10 +172,18 @@ def _make_run_task_node(
             harness_task=ht,
             resume=state.get("resume", resume),
             pipeline_runner=pipeline_runner,
+            task_index=state.get("task_index", 0) + 1,
         )
         if pipeline_runner is not None:
             harness_by_id[task.id] = pipeline_runner.get_task(task.id)
-            has_next = get_next_runnable_task(pipeline_runner.document) is not None
+            has_next = (
+                get_next_runnable_task(
+                    pipeline_runner.document,
+                    retry_failed=retry_failed,
+                    block_after_failed=stop_on_error,
+                )
+                is not None
+            )
             next_index = state.get("task_index", 0) + 1
         else:
             has_next = (state["task_index"] + 1) < len(plan.enabled_tasks())
@@ -178,6 +220,7 @@ def build_sequential_workflow(
     task_list_path: str | Path | None = None,
     resume: bool = False,
     skip_verification: bool = False,
+    retry_failed: bool = False,
 ) -> Any:
     """編譯 LangGraph：依 plan / task_list 順序執行任務。"""
     register_unity_servers(specs, config_path=unity_config_path)
@@ -202,6 +245,7 @@ def build_sequential_workflow(
             unity_config_path=unity_config_path,
             skip_verification=skip_verification,
             definition_of_done=plan.definition_of_done,
+            verification_max_tool_rounds=plan.verification_max_tool_rounds,
             specs=specs,
         )
 
@@ -212,6 +256,8 @@ def build_sequential_workflow(
         harness_by_id=harness_by_id,
         resume=resume,
         pipeline_runner=pipeline_runner,
+        stop_on_error=stop_on_error,
+        retry_failed=retry_failed,
     )
     graph.add_node("run_task", run_node)
     graph.add_edge(START, "run_task")
@@ -233,6 +279,7 @@ def run_build_plan(
     task_list_path: str | Path | None = None,
     resume: bool = False,
     skip_verification: bool = False,
+    retry_failed: bool = False,
 ) -> list[TaskResult]:
     """執行整份建構計畫並回傳各任務結果。
 
@@ -247,6 +294,7 @@ def run_build_plan(
         task_list_path=task_list_path,
         resume=resume,
         skip_verification=skip_verification,
+        retry_failed=retry_failed,
     )
     harness_by_id = harness_tasks_by_id(task_list) if task_list else {}
     initial: BuildState = {
@@ -260,7 +308,18 @@ def run_build_plan(
     }
     begin_session()
     try:
-        final = graph.invoke(initial)
+        with harness_progress_hooks():
+            harness_log("LangGraph 建構工作流開始")
+            final = graph.invoke(initial)
+            harness_log("LangGraph 建構工作流結束")
         return list(final.get("results", []))
     finally:
         end_session(flush=True)
+        if task_list is not None and default_project_state_root().is_dir():
+            path = Path(task_list_path) if task_list_path else default_task_list_path()
+            if path.is_file():
+                from core.pipeline.store import load_task_list
+
+                sync_project_state_from_task_list(load_task_list(path))
+            else:
+                sync_project_state_from_task_list(task_list)

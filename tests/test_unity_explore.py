@@ -1,6 +1,7 @@
 """unity_explore 單元測試。"""
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -60,6 +61,10 @@ def test_format_tools_summary() -> None:
 def test_verify_unity_mcp_connection_exits_when_no_tools(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        "unity_explore.UnityMcpServerSession",
+        lambda *a, **k: MagicMock(__enter__=lambda s: s, __exit__=lambda *a: None),
+    )
     monkeypatch.setattr(
         "unity_explore.register_unity_servers",
         lambda *a, **k: None,

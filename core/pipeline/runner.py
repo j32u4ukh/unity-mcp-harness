@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from harness.mcp_runner import UnityMCPRunner
+from core.harness_log import log_verification_end, log_verification_start
 
 from core.pipeline.schema import HarnessTask, OperationRecord, TaskListDocument
 from core.pipeline.store import inject_subtask, save_task_list
@@ -120,7 +120,7 @@ class HarnessTaskRunner:
         unity_config_path: str | Path | None = None,
         skip_verification: bool = False,
         definition_of_done: list[str] | None = None,
-        verification_max_tool_rounds: int = 6,
+        verification_max_tool_rounds: int = 10,
         specs: dict[str, Any] | None = None,
     ) -> None:
         self.document = document
@@ -162,7 +162,8 @@ class HarnessTaskRunner:
         if not result.success or not (result.reply or "").strip():
             return None
 
-        return run_task_verification(
+        log_verification_start(task.id)
+        verification = run_task_verification(
             task,
             agent_reply=result.reply,
             model=self.model,
@@ -173,8 +174,14 @@ class HarnessTaskRunner:
             definition_of_done=self.definition_of_done,
             idempotent_skip=reply_indicates_idempotent_skip(result.reply),
         )
+        log_verification_end(
+            task.id,
+            passed=verification.passed,
+            summary=verification.summary,
+        )
+        return verification
 
-    def on_task_end(self, task_id: str, result: TaskResult) -> HarnessTask:
+    def on_task_end(self, task_id: str, result: TaskResult) -> tuple[HarnessTask, TaskResult]:
         task = self.get_task(task_id)
 
         summary = _summarize_reply(result)
@@ -244,4 +251,4 @@ class HarnessTaskRunner:
 
         self._touch_document()
         self._persist()
-        return task
+        return task, result

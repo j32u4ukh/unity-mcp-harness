@@ -110,7 +110,7 @@ def init_workspace(
     target: Path,
     *,
     force: bool = False,
-    mcp_transport: McpTransport = "stdio",
+    mcp_transport: McpTransport = "http",
 ) -> InitReport:
     """Copy scaffold templates into *target* (created if missing)."""
     report = InitReport(target=target.resolve())
@@ -165,10 +165,11 @@ def format_init_report(report: InitReport) -> str:
             f"  1. 編輯 config\\secret.yaml（gemini.api_key）",
             f"  2. 編輯 config\\local.env.ps1（Unity 專案與 Editor 路徑）",
             f"  3. cd {report.target}",
-            "  4. .\\scripts\\list-tools.ps1          # 驗證 MCP（scripts 會自動設定 UNITY_MCP_HOME）",
-            "  5. 啟動 Unity 後：unity-mcp-harness --bootstrap-state  # 盤點既有專案 → project_state/",
-            "  6. .\\scripts\\harness-dry-run.ps1     # 規劃 + dry-run",
-            "  7. .\\scripts\\harness-run.ps1         # 執行建構",
+            "  4. .\\scripts\\list-tools.ps1          # 驗證 MCP（Harness 可 autostart Unity-MCP-Server）",
+            "  5. 啟動 Unity Editor（Plugin port 須與 unity_servers.json 一致，預設 22172）",
+            "  6. unity-mcp-harness --bootstrap-state  # 盤點既有專案 → project_state/",
+            "  7. .\\scripts\\harness-dry-run.ps1     # 規劃 + dry-run",
+            "  8. .\\scripts\\harness-run.ps1         # 執行建構",
             "（若直接跑 unity-mcp-harness CLI，請先 . .\\scripts\\_env.ps1 或設定 UNITY_MCP_HOME）",
         ]
     )

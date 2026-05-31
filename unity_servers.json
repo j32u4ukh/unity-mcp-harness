@@ -1,9 +1,14 @@
 {
   "unity": {
-    "transport": "stdio",
-    "command": "C:\\Users\\PC\\.unity\\relay\\relay_win.exe",
-    "args": ["--mcp"],
+    "transport": "http",
+    "url": "http://localhost:22172",
     "auth_type": "none",
-    "description": "Unity MCP via relay（stdio）"
+    "description": "IvanMurzak Unity-MCP-Server（Streamable HTTP）",
+    "autostart": {
+      "command": "dotnet",
+      "args": ["run", "--", "--port=22172", "--client-transport=streamableHttp"],
+      "cwd": "C:/Users/PC/Documents/llm-server/Unity-MCP/Unity-MCP-Server",
+      "ready_timeout_sec": 90
+    }
   }
 }

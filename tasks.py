@@ -40,6 +40,7 @@ class BuildPlan:
     project: str = "UnityProject"
     model: str | None = None
     max_tool_rounds: int = 10
+    verification_max_tool_rounds: int = 10
     mcp_servers: list[str] = field(default_factory=lambda: ["unity"])
     tasks: list[BuildTask] = field(default_factory=list)
     goal: str = ""
@@ -159,6 +160,9 @@ def load_build_plan(path: Path | str) -> BuildPlan:
         project=str(data.get("project", "UnityProject")),
         model=data.get("model"),
         max_tool_rounds=int(data.get("max_tool_rounds", 10)),
+        verification_max_tool_rounds=int(
+            data.get("verification_max_tool_rounds", data.get("max_tool_rounds", 10))
+        ),
         goal=_strip_multiline(data.get("goal")),
         definition_of_done=_parse_string_list(data.get("definition_of_done")),
         execution_strategy=_parse_execution_strategy(data.get("execution_strategy")),
@@ -296,6 +300,8 @@ def format_task_prompt(
         [
             "",
             "請透過 Unity MCP 工具實際修改 Editor 內容完成任務。",
+            "創建前先查目標 GameObject 是否存在；若工具回傳 JSON status=expected_not_found，代表可立即創建（非失敗）。",
+            "若 status=system_fatal_error，須修正參數或程式後再試。",
             "Scene 一律使用 Assets/Scenes/（勿用 Assets/_Scenes 等底線資料夾路徑）。",
             "若發現缺前置條件，請在回覆加入 "
             "[HARNESS_INJECT:{\"id\":\"...\",\"description\":\"...\",\"prompt\":\"...\",\"priority\":9}]。",
