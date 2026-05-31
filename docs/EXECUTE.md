@@ -282,3 +282,51 @@ PS unity-mcp-build> .\unity-mcp-build.exe
 ## 11) 相容別名
 
 舊版 `unity-mcp-build` 已移除；請見 [CLI.md](CLI.md) 的重新安裝步驟。
+
+
+--- 
+
+## 12) 調整規劃
+
+```
+unity-mcp-harness --goals [build|init|modify]
+```
+
+- build: 預設值，行為與目前相同，是將 build_goals.yaml 轉換成 task_list.yaml，沒設置參數的話也使用這個。
+
+- init: 開啟對話模式，與使用者討論此次 build_goals.yaml 內容，減少讓人手動編輯 build_goals.yaml 的部分。
+    - 首先要定義此次任務的一個里程碑
+    - unity-mcp-harness 根據該里程碑列出數項子目標，針對比較模糊的目標也在此時做進一步的提問與討論。
+    - 結束討論後，幫我輸出成符合規範的 build_goals.yaml，覆蓋原有內容。
+
+- modify: 開啟對話模式，針對 build_goals.yaml 現有項目作調整。
+    - 印出目前的子目標描述，帶有編號方便後續討論
+    - 選擇要討論的子目標後，印出更多的描述，並和我討論該項目標有無問題，是否該細分等
+    - 會對現有 build_goals.yaml 的子目標做增減或調整描述
+    - 不會直接覆蓋整個 build_goals.yaml
+
+
+```
+unity-mcp-harness --tools [|json]
+```
+
+- 取代原 unity-mcp-list-tools [|--json] 指令
+
+```
+unity-mcp-harness --chat
+```
+
+- 取代原 unity-mcp-chat 指令
+
+```
+unity-mcp-harness --sync
+```
+
+- 將 task_list.yaml 寫回 build_goals.yaml，原本轉換過程中，如果 AGENT 認定需要新增或減少幾項更加明確的任務，目標數和任務數可能發生偏離。執行期間也可能針對實際任務描述的 task_list.yaml 做手動修改，此指令幫我將 task_list.yaml 寫回 build_goals.yaml，由於是目標，所以不會像實際任務描述的那個詳細，但可以確保下一次再利用 build_goals.yaml 生成 task_list.yaml 的時候，不會落差太大。
+
+
+```
+unity-mcp-harness --status
+```
+
+- 針對目前場景中的狀態，對狀態數文件做全面更新
