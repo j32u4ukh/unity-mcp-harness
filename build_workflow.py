@@ -26,6 +26,8 @@ from core.pipeline.runner import HarnessTaskRunner
 from core.pipeline.schema import HarnessTask, TaskListDocument
 from core.pipeline.store import default_task_list_path
 from core.project_state import begin_session, end_session
+from core.project_state.paths import default_project_state_root
+from core.project_state.ssot import sync_project_state_from_task_list
 from tasks import BuildPlan, BuildTask, TaskResult, format_task_prompt
 from unity_common import (
     ask_unity,
@@ -313,3 +315,11 @@ def run_build_plan(
         return list(final.get("results", []))
     finally:
         end_session(flush=True)
+        if task_list is not None and default_project_state_root().is_dir():
+            path = Path(task_list_path) if task_list_path else default_task_list_path()
+            if path.is_file():
+                from core.pipeline.store import load_task_list
+
+                sync_project_state_from_task_list(load_task_list(path))
+            else:
+                sync_project_state_from_task_list(task_list)

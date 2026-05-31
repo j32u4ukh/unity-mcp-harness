@@ -189,6 +189,23 @@ Error: Connection revoked. Go to Unity Editor > Project Settings > AI > Unity MC
 
 ---
 
+## 10.2 腳本任務驗證（assets-find）
+
+- **腳本檔存在**與 **Player 已掛載腳本** 分開驗證；`ensure_*script*` 類任務的 `verify_read` 用 `t:Script <類別名>`，不以完整 `Assets/.../*.cs` 當 filter。
+- `task_list` 載入時會 `backfill` 升級過期的 `gameobject-find(PlayerController)` 驗證計畫。
+- `operations_executed` 的 `tool` 欄為 Harness 階段標籤（`harness:verification_mcp_loop` 等），非單一 MCP 工具名。
+
+## 10.1 project_state 與 task_list SSOT
+
+- **執行完成與否**以 `task_list.yaml` 的 `status` / `verification` 為準，不以 Agent 回覆或舊 `project_state` 章節為準。
+- `tasks/<id>.md` 僅保留 **`## 當前狀態`**（Harness 覆寫）；過期 `## 任務 …` 由 `--sync-project-state` 修剪。
+- Plan Normalize 會讀 **【執行隊列 SSOT】** 區塊；僅 `completed` + `verified` / `skipped_by_idempotent` 可省略藍圖子項。
+- 重大重試或備忘錯亂後：`unity-mcp-harness --sync-project-state`，必要時再 `--bootstrap-state`。
+
+詳見 [PROJECT_STATE.md](./PROJECT_STATE.md)。
+
+---
+
 ## 相關文件
 
 - [專案 README](../README.md) — 快速開始

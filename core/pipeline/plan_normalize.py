@@ -13,7 +13,7 @@ from aicentral import Chat
 from aicentral.core.errors import StructuredNoPayloadError, StructuredValidationError
 from aicentral.exceptions import ProviderError
 
-from core.pipeline.schema import HarnessHints, NormalizedPlan, NormalizedTask, TaskTarget
+from core.pipeline.schema import HarnessHints, NormalizedPlan, NormalizedTask, TaskListDocument, TaskTarget
 from core.harness_log import (
     log_plan_normalize_fallback,
     log_plan_normalize_llm_attempt,
@@ -44,14 +44,22 @@ PLAN_NORMALIZE_SYSTEM = """你是 Unity MCP Harness 的規劃器（Plan Normaliz
 7. target（可選）：game_object、scene_path。
 
 ## 驗證 MCP 預算（寫入 harness.verify_read）
-- 標準任務：先 find(includeComponents+includeData)，必要時至多 1 次 component-get（須含 instanceID），然後輸出 JSON。
-- 冪等「已存在，跳過」：僅 1 次 find 確認存在即可。
+- 標準場景任務：先 gameobject-find(includeComponents+includeData)，必要時至多 1 次 component-get（須含 instanceID），然後輸出 JSON。
+- **腳本檔案任務**（建立/確認 .cs，尚未要求掛載）：verify_read 用 `assets-find` + filter=`t:Script <類別名>`；**禁止**僅用 gameobject-find(PlayerController)；**禁止**用完整 `Assets/.../*.cs` 路徑當 filter。
+- **腳本掛載/邏輯任務**：先 `t:Script` 確認資產，再 gameobject-find 確認 Player 含 PlayerController 元件。
+- 冪等「已存在，跳過」：腳本檔任務用 1 次 `t:Script`；場景物件用 1 次 gameobject-find。
 - 禁止冗餘 object-get-data、禁止對同一 instanceID 重複讀取。
 
 ## 規則
 - 可將少量粗任務拆成多條可執行子任務（例如 3 條 → 6 條），順序符合依賴。
 - 禁止輸出自由散文；僅輸出符合 schema 的 JSON。
 - plan_changelog：簡述相對輸入的拆分/合併/改寫（繁體中文）。
+
+## 完成判定（SSOT 優先）
+- 使用者訊息若含【執行隊列 SSOT — task_list.yaml】，**以此為準**；project_state 僅輔助。
+- 僅當 SSOT 中某任務 `status=completed` 且 `verification` 為 `verified` 或 `skipped_by_idempotent` 時，才可省略對應藍圖子項。
+- `failed` / `pending` / `in_progress` 或 verification 非上述值者，**必須**規劃為可執行任務（或子任務），不得因 project_state 備忘寫「已完成」。
+- 與 SSOT 衝突的 project_state 敘述一律忽略。
 
 ## 領域補充（重要）
 - 具體領域規則（如 Sprite 幾何、資產生成策略）**不在**本 system prompt。
@@ -247,6 +255,7 @@ def build_normalize_user_prompt(
     *,
     extra_context: str = "",
     supplement_context: str = "",
+    task_list_doc: TaskListDocument | None = None,
 ) -> str:
     """組裝送給規劃 LLM 的使用者訊息。"""
     tasks_payload = []
@@ -278,6 +287,22 @@ def build_normalize_user_prompt(
     ]
     if supplement_context.strip():
         sections.extend(["", supplement_context.strip()])
+
+    ssot_doc = task_list_doc
+    if ssot_doc is None:
+        from core.pipeline.store import default_task_list_path, load_task_list
+
+        tl_path = default_task_list_path()
+        if tl_path.is_file():
+            try:
+                ssot_doc = load_task_list(tl_path)
+            except (ValueError, OSError):
+                ssot_doc = None
+    if ssot_doc is not None and ssot_doc.tasks:
+        from core.project_state.ssot import format_task_list_for_planning
+
+        sections.extend(["", format_task_list_for_planning(ssot_doc)])
+
     from core.project_state.context import format_project_state_for_planning
 
     project_state_ctx = format_project_state_for_planning()
@@ -299,6 +324,7 @@ def normalize_plan(
     chat: Chat | None = None,
     specs: dict[str, dict[str, Any]] | None = None,
     unity_config_path: str | None = None,
+    task_list_doc: TaskListDocument | None = None,
 ) -> NormalizedPlan:
     """
     以 LLM 規範化藍圖任務；失敗時回退 passthrough。
@@ -343,6 +369,7 @@ def normalize_plan(
         plan,
         extra_context=extra,
         supplement_context=supplement_context,
+        task_list_doc=task_list_doc,
     )
     resolved_model = resolve_unity_llm_model(model or plan.model)
     session = chat or Chat.stateless(system=PLAN_NORMALIZE_SYSTEM, model=resolved_model)

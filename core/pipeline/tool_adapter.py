@@ -7,9 +7,10 @@ from datetime import datetime, timezone
 
 from core.pipeline.schema import HarnessTask, OperationRecord
 
-DEFAULT_READ_TOOL = "unity__Unity_ListResources"
-DEFAULT_VERIFY_TOOL = "unity__Unity_RunCommand"
-DEFAULT_WRITE_TOOL = "unity__MCP_AgentExecute"
+# operations_executed.tool 為紀錄用標籤，未必對應單一 MCP 工具名稱
+DEFAULT_READ_TOOL = "harness:pre_read_plan"
+DEFAULT_VERIFY_TOOL = "harness:verification_mcp_loop"
+DEFAULT_WRITE_TOOL = "harness:agent_reply"
 
 
 def utc_now_iso() -> str:

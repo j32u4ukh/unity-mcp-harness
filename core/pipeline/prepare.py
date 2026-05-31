@@ -11,7 +11,17 @@ from core.pipeline.goals_writeback import write_back_build_goals
 from core.pipeline.plan_normalize import normalize_plan, normalize_plan_passthrough_enriched
 from core.pipeline.schema import NormalizedPlan, NormalizedTask, TaskListDocument
 from core.pipeline.store import default_task_list_path
+from core.project_state.paths import default_project_state_root
+from core.project_state.ssot import sync_project_state_from_task_list
 from tasks import BuildPlan, resolve_build_plan
+
+
+def _sync_project_state_from_doc(doc: TaskListDocument) -> int:
+    """依 task_list 同步 project_state；無目錄時略過。"""
+    root = default_project_state_root()
+    if not root.is_dir():
+        return 0
+    return sync_project_state_from_task_list(doc, root=root)
 
 
 def _normalized_from_task_list(doc: TaskListDocument) -> NormalizedPlan:
@@ -81,10 +91,13 @@ def prepare_harness_queue(
             )
         else:
             existing_revision = 1
+            task_list_for_plan: TaskListDocument | None = None
             if had_task_list and replan:
                 from core.pipeline.store import load_task_list
 
-                existing_revision = load_task_list(task_path).plan_revision + 1
+                task_list_for_plan = load_task_list(task_path)
+                existing_revision = task_list_for_plan.plan_revision + 1
+                _sync_project_state_from_doc(task_list_for_plan)
             normalized = normalize_plan(
                 build_plan,
                 plan_revision=existing_revision,
@@ -93,6 +106,7 @@ def prepare_harness_queue(
                 supplements_path=supplements_path,
                 specs=specs,
                 unity_config_path=unity_config_path,
+                task_list_doc=task_list_for_plan,
             )
         if write_back_goals:
             write_back_build_goals(normalized, goals_path, backup=backup_goals)
@@ -113,6 +127,8 @@ def prepare_harness_queue(
             save_task_list(task_list, task_path)
         normalized = _normalized_from_task_list(task_list)
         created = False
+
+    _sync_project_state_from_doc(task_list)
 
     return HarnessPrepareResult(
         build_plan=build_plan,

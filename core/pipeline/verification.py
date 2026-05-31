@@ -9,8 +9,10 @@ from typing import Any
 
 from core.pipeline.schema import HarnessTask
 from core.pipeline.verify_hints import (
+    ASSETS_FIND_RULE,
     VERIFY_READ_IDEMPOTENT,
     VERIFY_READ_STANDARD,
+    build_idempotent_script_verify_read,
     infer_game_object_name,
     infer_scene_path,
 )
@@ -41,6 +43,9 @@ _VERIFIER_SYSTEM = f"""\
 若 MCP 連線失敗、工具遭拒絕、或無法取得證據，設 verified 為 false 並在 failure_reason 說明。
 禁止憑 Agent 宣稱或臆測填 verified=true；每一項 passed=true 必須有工具回傳依據寫在 detail。
 gameobject-component-get 的 componentRef 必須含有效 instanceID（來自 find 結果），禁止空物件 {{}}。
+
+{ASSETS_FIND_RULE}
+腳本「檔案存在」與「已掛載到 GameObject」是不同檢查；verify_read 若標明僅驗證資產，不得以未掛載為由判 failed。
 """
 
 
@@ -151,7 +156,8 @@ def evaluate_verification_payload(data: dict[str, Any]) -> VerificationResult:
 def _resolve_verify_read(task: HarnessTask, *, idempotent_skip: bool) -> str:
     custom = (task.harness.verify_read or "").strip()
     if idempotent_skip:
-        base = VERIFY_READ_IDEMPOTENT
+        script_idem = build_idempotent_script_verify_read(task)
+        base = script_idem if script_idem else VERIFY_READ_IDEMPOTENT
         if custom:
             return f"{base}\n\n【任務專用 verify_read】\n{custom}"
         return base
@@ -229,6 +235,19 @@ def build_verification_prompt(
     post_hint = (task.harness.post_read or "").strip()
     if post_hint and not (gen_dir and gen_name):
         check_items.append(f"額外：{post_hint}")
+
+    from core.pipeline.verify_hints import classify_script_task
+
+    script_kind = classify_script_task(task)
+    if script_kind == "file":
+        check_items.append(
+            "本任務僅驗證腳本 .cs 資產（assets-find + `t:Script`）；"
+            "**禁止**因 Player 未掛載 PlayerController 而判 verified=false。"
+        )
+    elif script_kind == "mount":
+        check_items.append(
+            "須同時確認腳本資產（t:Script）與 Player 上已掛載 PlayerController 元件。"
+        )
 
     lines.append("")
     lines.append("【須涵蓋的檢查項（寫入 checks）】")

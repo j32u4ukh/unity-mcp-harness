@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from core.pipeline.schema import HarnessTask
-from core.project_state.delta import markdown_section_block, summarize_text
+from core.project_state.delta import MarkdownAppend, markdown_section_block, summarize_text
 from core.project_state.index import StateIndexEntry, utc_now_iso
 from core.project_state.paths import default_project_state_root
 from core.project_state.session import ProjectStateSession, begin_session, end_session
@@ -94,10 +94,13 @@ def _record_bootstrap_reply(session: ProjectStateSession, reply: str, *, success
         "_index.yaml",
     ]
     for key, rel in (
+        ("scenes/overview", "scenes/_overview.md"),
         ("assets/overview", "assets/_overview.md"),
         ("systems/overview", "systems/_overview.md"),
     ):
-        session.markdown_pending.setdefault(rel, []).append(overview_block)
+        session.markdown_pending.setdefault(rel, []).append(
+            MarkdownAppend(rel_path=rel, block=overview_block)
+        )
         session.index.upsert(
             StateIndexEntry(
                 key=key,

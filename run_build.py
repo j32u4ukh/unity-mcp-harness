@@ -127,6 +127,11 @@ def parse_args() -> argparse.Namespace:
         help="唯讀 MCP 盤點既有 Unity 專案並寫入 project_state/（需先 --init 與設定 local.env.ps1）",
     )
     parser.add_argument(
+        "--sync-project-state",
+        action="store_true",
+        help="依 task_list.yaml 重建 project_state 索引與 tasks/*.md（修剪過期章節）",
+    )
+    parser.add_argument(
         "--bootstrap-prompt",
         type=str,
         default=None,
@@ -259,6 +264,26 @@ def main() -> None:
             sys.exit(1)
         print(format_bootstrap_report(report))
         sys.exit(0 if report.ok else 1)
+
+    if args.sync_project_state:
+        from core.project_state.paths import default_project_state_root
+        from core.project_state.ssot import sync_project_state_from_task_list
+
+        task_list_path = default_task_list_path()
+        if not task_list_path.is_file():
+            print(f"錯誤: 找不到 {task_list_path}", file=sys.stderr)
+            sys.exit(1)
+        if not default_project_state_root().is_dir():
+            print("錯誤: 找不到 project_state/，請先 --init", file=sys.stderr)
+            sys.exit(1)
+        try:
+            doc = load_task_list(task_list_path)
+            n = sync_project_state_from_task_list(doc)
+        except (ValueError, OSError) as exc:
+            handle_errors(exc)
+            sys.exit(1)
+        print(f"已同步 project_state（{n} 個任務檔 + 索引/overview）")
+        sys.exit(0)
 
     try:
         plan_cli = resolve_plan_cli(args)
