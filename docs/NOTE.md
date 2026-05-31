@@ -110,6 +110,16 @@ README 曾把 Cursor 的 `mcpServers` 範例寫成「複製到 unity_servers.jso
 
 workflow 每任務只有 **OK / FAIL**（+ 驗證結果），**不會**自動分級「有場景但缺燈光」。要分級驗收需另做工具查詢或專用驗證任務（如 `validate_scene`）。
 
+### 10. GameObject.Find「找不到」震碎 tool loop（IvanMurzak）
+
+**現象**：Agent 創建前先 `game-object-find`，場景中本來就沒有該物件時 Unity 拋 `Not found GameObject with name '…'`，MCP 回 JSON-RPC error，aicentral tool loop 中斷，Agent 誤以為通訊失敗。
+
+**現狀**：Harness 在 `core/mcp/filtered_orchestrator.py` 攔截此錯誤，降級為 JSON `status: expected_not_found`（含 `harness_next_action: route_to_create`），tool loop **不中断**。真實崩潰（NullReference、編譯錯誤等）封裝為 `system_fatal_error`（`route_to_self_correction`），仍回傳 tool message 供模型自我修正。
+
+**Agent 認知**：`harness/mcp_runner.compose_unity_agent_system()` 自動注入 `core/prompts/unity_observer_protocol.py`。LangGraph **task 圖**仍為 `run_task → 下一任務`；tool 級分流由 LLM 讀 JSON 決策，非另建 ToolNode 條件邊。
+
+**日誌**：`-v` 時 filtered 的 not-found 會顯示 `[filtered] expected_not_found`。
+
 ---
 
 ## 建議的自建 Agent 流程

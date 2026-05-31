@@ -106,6 +106,25 @@ def test_normalize_plan_structured_three_to_six(mock_chat_cls: MagicMock) -> Non
     assert len(normalized.normalized_tasks) == 6
     assert normalized.plan_changelog == "3→6"
     mock_session.complete_structured.assert_called_once()
+    assert mock_session.complete_structured.call_args.kwargs.get("mode") == "json"
+
+
+@patch("core.pipeline.plan_normalize.Chat")
+def test_normalize_plan_falls_back_on_structured_validation_error(mock_chat_cls: MagicMock) -> None:
+    from aicentral.core.errors import StructuredValidationError
+
+    plan = _sample_plan()
+    mock_session = MagicMock()
+    mock_session.complete_structured.side_effect = StructuredValidationError(
+        "bad schema",
+        response_model=PlanNormalizeResponse,
+        validation_detail="normalized_tasks.0: invalid",
+    )
+    mock_chat_cls.stateless.return_value = mock_session
+
+    normalized = normalize_plan(plan, model="local-chat")
+    assert len(normalized.normalized_tasks) == 2
+    assert "passthrough" in normalized.plan_changelog
 
 
 def test_build_normalize_user_prompt_includes_goals() -> None:

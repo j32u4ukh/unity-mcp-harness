@@ -36,7 +36,12 @@ from unity_common import (
 
 
 class BuildState(TypedDict):
-    """建構執行狀態（LangGraph）。"""
+    """建構執行狀態（LangGraph）。
+
+    注意：MCP tool 級別的 ``route_to_create`` / ``route_to_self_correction`` 由
+    ``core/mcp/tool_error_filter`` 在 aicentral tool loop 內以 JSON 分流，
+    不在此 StateGraph 另建 ToolNode 條件邊（單一 ``run_task`` 節點內含多輪 tool loop）。
+    """
 
     plan: BuildPlan
     task_index: int

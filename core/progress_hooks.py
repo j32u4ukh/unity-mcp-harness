@@ -12,6 +12,7 @@ from core.harness_log import (
     log_llm_round,
     log_mcp_tool,
 )
+from core.mcp.filtered_orchestrator import run_tool_calls_with_harness_filter
 
 
 @contextmanager
@@ -46,8 +47,21 @@ def harness_progress_hooks() -> Iterator[None]:
         except Exception as exc:
             log_mcp_tool(server_name, tool_name, args, error=str(exc))
             raise
-        preview = orch.serialize_tool_result(result)
-        log_mcp_tool(server_name, tool_name, args, result_preview=preview)
+        from aicentral.mcp.orchestrator import serialize_tool_result
+
+        from core.mcp.tool_error_filter import extract_error_text_from_tool_result
+
+        preview = serialize_tool_result(result)
+        err = extract_error_text_from_tool_result(result)
+        if err and "expected_not_found" in preview:
+            log_mcp_tool(
+                server_name,
+                tool_name,
+                args,
+                result_preview="[filtered] expected_not_found",
+            )
+        else:
+            log_mcp_tool(server_name, tool_name, args, result_preview=preview)
         return result
 
     def logged_run_tool_calls(
@@ -57,7 +71,7 @@ def harness_progress_hooks() -> Iterator[None]:
         name_to_server: dict[str, str],
     ) -> list[dict[str, Any]]:
         pending_tools[0] = len(tool_calls)
-        messages = orig_run_tool_calls(
+        messages = run_tool_calls_with_harness_filter(
             tool_calls,
             mgr=mgr,
             name_to_server=name_to_server,

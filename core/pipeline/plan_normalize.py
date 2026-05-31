@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from aicentral import Chat
+from aicentral.core.errors import StructuredNoPayloadError, StructuredValidationError
 from aicentral.exceptions import ProviderError
 
 from core.pipeline.schema import HarnessHints, NormalizedPlan, NormalizedTask, TaskTarget
@@ -274,6 +275,7 @@ def normalize_plan(
         result = session.complete_structured(
             user_prompt,
             response_model=PlanNormalizeResponse,
+            mode="json",
         )
         normalized = NormalizedPlan(
             normalized_tasks=[_task_from_out(t) for t in result.normalized_tasks],
@@ -289,7 +291,13 @@ def normalize_plan(
             supplements_path=supplements_path,
             plan_interactive=plan_interactive,
         )
-    except (ProviderError, ValueError, json.JSONDecodeError) as exc:
+    except (
+        ProviderError,
+        ValueError,
+        json.JSONDecodeError,
+        StructuredNoPayloadError,
+        StructuredValidationError,
+    ) as exc:
         _logger.warning("Plan Normalize LLM 失敗，改用 passthrough: %s", exc)
         fallback = normalize_plan_passthrough(plan, plan_revision=plan_revision)
         fallback.plan_changelog = f"LLM 規劃失敗（{exc}），已 passthrough"

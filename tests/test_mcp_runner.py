@@ -19,7 +19,8 @@ def test_create_unity_mcp_runner(mock_with_mcp: MagicMock, _mock_model: MagicMoc
     assert isinstance(runner, UnityMCPRunner)
     mock_with_mcp.assert_called_once()
     kwargs = mock_with_mcp.call_args.kwargs
-    assert kwargs["system"] == "explore"
+    assert "explore" in kwargs["system"]
+    assert "expected_not_found" in kwargs["system"]
     assert kwargs["max_tool_rounds"] == 3
     assert runner.ask("hi") == mock_chat.ask.return_value
     mock_chat.ask.assert_called_once_with("hi")
