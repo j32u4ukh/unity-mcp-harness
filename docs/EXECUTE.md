@@ -288,16 +288,21 @@ PS unity-mcp-build> .\unity-mcp-build.exe
 
 ## 12) 調整規劃
 
+<!-- ✅ HARNESS_EXECUTE_12_IMPLEMENTED — 見 config/harness_capabilities.marker -->
+
 ```
 unity-mcp-harness --goals [build|init|modify]
 ```
 
+> **已實作**（2026-05）：下列子指令已掛入 `unity-mcp-harness`；完成後會寫入 `config/harness_capabilities.marker`（`tag: HARNESS_EXECUTE_12_IMPLEMENTED`）。藍圖路徑改為 `-g` / `--goals-file`（原 `-g` 僅路徑時請改用 `--goals-file`）。
+
 - build: 預設值，行為與目前相同，是將 build_goals.yaml 轉換成 task_list.yaml，沒設置參數的話也使用這個。
 
 - init: 開啟對話模式，與使用者討論此次 build_goals.yaml 內容，減少讓人手動編輯 build_goals.yaml 的部分。
-    - 首先要定義此次任務的一個里程碑
-    - unity-mcp-harness 根據該里程碑列出數項子目標，針對比較模糊的目標也在此時做進一步的提問與討論。
-    - 結束討論後，幫我輸出成符合規範的 build_goals.yaml，覆蓋原有內容。
+    - 首先要定義此次任務的一個里程碑（之後提問**僅收斂**於里程碑內，不向外擴散新系統）
+    - 討論涉及**現有**腳本/場景/資產時，Harness 會透過 **Unity MCP 唯讀**查證（需 Editor + MCP Server）；可用 `/mcp 你的問題` 強制查詢
+    - unity-mcp-harness 根據該里程碑列出數項子目標，針對模糊處做 1～3 個具體問題
+    - 結束討論後輸入 `/write`，輸出符合規範的 build_goals.yaml，覆蓋原有內容
 
 - modify: 開啟對話模式，針對 build_goals.yaml 現有項目作調整。
     - 印出目前的子目標描述，帶有編號方便後續討論
@@ -307,10 +312,11 @@ unity-mcp-harness --goals [build|init|modify]
 
 
 ```
-unity-mcp-harness --tools [|json]
+unity-mcp-harness --tools
+unity-mcp-harness --tools json
 ```
 
-- 取代原 unity-mcp-list-tools [|--json] 指令
+- 取代原 unity-mcp-list-tools [|--json] 指令（舊指令仍可用）
 
 ```
 unity-mcp-harness --chat

@@ -34,6 +34,16 @@ from core.cli_plan import (
     resolve_plan_cli,
 )
 from core.mcp.server_lifecycle import UnityMcpServerSession
+from core.cli_extended import (
+    EXECUTE_SECTION_12_TAG,
+    run_chat_mode,
+    run_goals_init,
+    run_goals_modify,
+    run_list_tools,
+    run_status_update,
+    run_sync_goals,
+    write_capabilities_marker,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,10 +54,48 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "-g",
-        "--goals",
+        "--goals-file",
+        dest="goals_file",
         type=str,
         default=None,
-        help="建構任務 YAML/JSON（預設 build_goals.yaml 或 example）",
+        help="建構藍圖 YAML/JSON（預設 build_goals.yaml）",
+    )
+    parser.add_argument(
+        "--goals",
+        dest="goals_mode",
+        nargs="?",
+        const="build",
+        choices=("build", "init", "modify"),
+        help="藍圖模式：build=預設建構/規劃、init=對話建立藍圖、modify=對話調整藍圖",
+    )
+    ext = parser.add_argument_group("統一入口（EXECUTE §12）")
+    ext.add_argument(
+        "--tools",
+        nargs="?",
+        const="list",
+        choices=("list", "json"),
+        help="列出 Unity MCP 工具（json=JSON 輸出；取代 unity-mcp-list-tools）",
+    )
+    ext.add_argument(
+        "--chat",
+        action="store_true",
+        help="Unity 專案探索 REPL（取代 unity-mcp-chat）",
+    )
+    ext.add_argument(
+        "--sync",
+        action="store_true",
+        help="將 task_list.yaml 規劃欄位寫回 build_goals.yaml",
+    )
+    ext.add_argument(
+        "--status",
+        action="store_true",
+        help="MCP 盤點並全面更新 project_state（含 task_list SSOT 同步）",
+    )
+    parser.add_argument(
+        "--servers",
+        type=str,
+        default=None,
+        help="與 --chat 合用：MCP server 名稱（逗號分隔）",
     )
     parser.add_argument(
         "-c",
@@ -231,9 +279,56 @@ def _print_results(results) -> None:
         print()
 
 
+def _resolve_goals_path(args: argparse.Namespace):
+    return getattr(args, "goals_file", None) or getattr(args, "goals", None)
+
+
 def main() -> None:
     args = parse_args()
     configure_harness_log(quiet=args.quiet, verbose=args.verbose)
+
+    if getattr(args, "tools", None) is not None:
+        as_json = args.tools == "json"
+        sys.exit(run_list_tools(unity_config=args.unity_config, as_json=as_json))
+
+    if args.chat:
+        sys.exit(run_chat_mode(args))
+
+    if args.sync:
+        sys.exit(run_sync_goals(goals_file=_resolve_goals_path(args), backup=args.backup))
+
+    if args.status:
+        sys.exit(
+            run_status_update(
+                unity_config=args.unity_config,
+                bootstrap_prompt=args.bootstrap_prompt,
+                aicentral_config=args.aicentral_config,
+                secret=args.secret,
+            )
+        )
+
+    goals_mode = getattr(args, "goals_mode", None) or "build"
+    if goals_mode == "init":
+        sys.exit(
+            run_goals_init(
+                goals_file=_resolve_goals_path(args),
+                model=None,
+                aicentral_config=args.aicentral_config,
+                secret=args.secret,
+                unity_config_path=args.unity_config,
+            )
+        )
+    if goals_mode == "modify":
+        sys.exit(
+            run_goals_modify(
+                goals_file=_resolve_goals_path(args),
+                model=None,
+                aicentral_config=args.aicentral_config,
+                secret=args.secret,
+                unity_config_path=args.unity_config,
+            )
+        )
+
     if args.init is not None:
         from core.scaffold.init_workspace import format_init_report, init_workspace
 
@@ -303,7 +398,9 @@ def main() -> None:
             handle_errors(exc)
             sys.exit(1)
         try:
-            out = write_back_task_list_goals(task_list, args.goals, backup=args.backup)
+            out = write_back_task_list_goals(
+                task_list, _resolve_goals_path(args), backup=args.backup
+            )
         except (FileNotFoundError, ValueError, OSError) as exc:
             handle_errors(exc)
             sys.exit(1)
@@ -319,7 +416,7 @@ def main() -> None:
         log_prepare_phase("載入 build_goals / Plan Normalize / bootstrap task_list")
         with harness_progress_hooks():
             prepared = prepare_harness_queue(
-                goals_path=args.goals,
+                goals_path=_resolve_goals_path(args),
                 skip_plan_normalize=args.skip_plan_normalize,
                 replan=plan_cli.need_replan,
                 init_tasks=False,
@@ -379,7 +476,9 @@ def main() -> None:
 
     if plan_cli.goals_to_task_list:
         if plan_cli.export_goals_from_task_list:
-            write_back_task_list_goals(task_list, args.goals, backup=args.backup)
+            write_back_task_list_goals(
+                task_list, _resolve_goals_path(args), backup=args.backup
+            )
             print("（已將 task_list 規劃欄位寫回 build_goals.yaml）")
         if plan_cli.export_goals_from_normalize and not plan_cli.write_back_in_prepare:
             print("（已於規劃階段將 Normalize 結果寫回 build_goals.yaml）")
@@ -436,6 +535,10 @@ def main() -> None:
 
     if results and not all(r.success for r in results):
         sys.exit(1)
+
+    marker = write_capabilities_marker()
+    if goals_mode == "build" and not plan_cli.goals_to_task_list and not args.dry_run:
+        print(f"（{EXECUTE_SECTION_12_TAG} 能力已就緒；標記: {marker.name}）")
 
 
 if __name__ == "__main__":

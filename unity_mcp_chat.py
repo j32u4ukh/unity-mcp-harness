@@ -122,24 +122,30 @@ def run_repl(
         print()
 
 
-def main() -> None:
-    args = parse_args()
-    require_aicentral_config(
-        aicentral_config=args.aicentral_config,
-        secret=args.secret,
-    )
+def run_interactive_chat(
+    *,
+    unity_config: str | None = None,
+    servers: str | None = None,
+    no_tool_history: bool = False,
+    no_probe: bool = False,
+    probe: bool = False,
+    aicentral_config: str | None = None,
+    secret: str | None = None,
+) -> None:
+    """執行探索 REPL（供 unity-mcp-chat 與 unity-mcp-harness --chat 共用）。"""
+    require_aicentral_config(aicentral_config=aicentral_config, secret=secret)
     explore = load_explore_settings()
 
     specs = (
-        resolve_server_specs(config_path=args.unity_config)
-        if args.unity_config
+        resolve_server_specs(config_path=unity_config)
+        if unity_config
         else resolve_server_specs()
     )
-    tools_map = verify_unity_mcp_connection(
-        specs=specs,
-        config_path=args.unity_config,
-    )
-    server_names = _resolve_servers(args, specs)
+    tools_map = verify_unity_mcp_connection(specs=specs, config_path=unity_config)
+    if servers:
+        server_names = [s.strip() for s in servers.split(",") if s.strip()]
+    else:
+        server_names = registered_server_names(specs)
 
     from unity_common import create_unity_chat
 
@@ -153,8 +159,8 @@ def main() -> None:
         detail="模式：先以 MCP 查詢 Editor 現況，再回答與討論（非純聊天）",
         specs=specs,
         interactive=True,
-        aicentral_config=args.aicentral_config,
-        secret=args.secret,
+        aicentral_config=aicentral_config,
+        secret=secret,
     )
     print("可用 MCP 工具：")
     print(format_tools_summary(tools_map))
@@ -165,11 +171,11 @@ def main() -> None:
         system=system,
         max_tool_rounds=explore.max_tool_rounds,
         specs=specs,
-        config_path=args.unity_config,
-        include_tool_messages_in_history=not args.no_tool_history,
+        config_path=unity_config,
+        include_tool_messages_in_history=not no_tool_history,
     )
 
-    do_probe = args.probe or (explore.probe_on_chat_start and not args.no_probe)
+    do_probe = probe or (explore.probe_on_chat_start and not no_probe)
     if do_probe:
         _run_probe(chat, explore.probe_prompt)
 
@@ -177,6 +183,23 @@ def main() -> None:
         run_repl(chat, tools_map=tools_map, probe_prompt=explore.probe_prompt)
     except KeyboardInterrupt:
         print("\n再見。")
+
+
+def main() -> None:
+    args = parse_args()
+    print(
+        "提示: 亦可使用 unity-mcp-harness --chat（統一入口）。",
+        file=__import__("sys").stderr,
+    )
+    run_interactive_chat(
+        unity_config=args.unity_config,
+        servers=args.servers,
+        no_tool_history=args.no_tool_history,
+        no_probe=args.no_probe,
+        probe=args.probe,
+        aicentral_config=args.aicentral_config,
+        secret=args.secret,
+    )
 
 
 if __name__ == "__main__":

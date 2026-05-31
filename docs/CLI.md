@@ -1,8 +1,23 @@
 # unity-mcp-harness CLI 速查
 
-入口指令：`unity-mcp-harness`（建構）、`unity-mcp-list-tools`、`unity-mcp-ask`、`unity-mcp-chat`。
+入口指令：`unity-mcp-harness`（建構與統一子命令）、`unity-mcp-list-tools`、`unity-mcp-ask`、`unity-mcp-chat`。
 
 > **舊版 `unity-mcp-build` 已移除。** 請改裝 `unity-mcp-harness`（見下方「重新安裝」）。
+
+## 統一入口（EXECUTE §12 — 已實作）
+
+標記檔：`config/harness_capabilities.marker`（`tag: HARNESS_EXECUTE_12_IMPLEMENTED`）
+
+| 參數 | 說明 |
+|------|------|
+| `--goals init` | 對話建立 `build_goals.yaml`（`/write` 覆寫） |
+| `--goals modify` | 對話調整既有 tasks（`/write` 只更新 tasks） |
+| `--goals` / `--goals build` | 預設建構流程（同無旗標） |
+| `-g` / `--goals-file` | 藍圖路徑（原 `-g` 改為 `--goals-file`） |
+| `--tools` / `--tools json` | 列出 MCP 工具 |
+| `--chat` | 探索 REPL |
+| `--sync` | `task_list` → `build_goals` |
+| `--status` | MCP 盤點 + `project_state` 同步 |
 
 ## 兩份 YAML 各是什麼
 

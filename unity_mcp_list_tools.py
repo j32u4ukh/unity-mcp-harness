@@ -31,6 +31,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     require_aicentral_config()
     args = parse_args()
+    print(
+        "提示: 亦可使用 unity-mcp-harness --tools 或 --tools json。",
+        file=sys.stderr,
+    )
 
     try:
         specs = resolve_server_specs(config_path=args.config) if args.config else resolve_server_specs()
