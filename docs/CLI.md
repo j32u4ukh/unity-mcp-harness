@@ -28,6 +28,20 @@
 
 `--backup` 可與任一 export 合用（寫回前產生 `build_goals.yaml.bak`）。
 
+## 執行期日誌
+
+預設 **`unity-mcp-harness` 執行建構時**會即時輸出進度到 stderr（任務開始/結束、LLM 各輪、MCP tool 呼叫、Harness 驗證）：
+
+```powershell
+unity-mcp-harness
+# 含 MCP tool 回傳摘要
+unity-mcp-harness -v
+# 安靜模式（僅錯誤與最終摘要）
+unity-mcp-harness -q
+```
+
+環境變數：`HARNESS_VERBOSE=1`、`HARNESS_QUIET=1`。
+
 ## 常見流程
 
 ```powershell

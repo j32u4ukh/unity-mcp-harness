@@ -9,9 +9,11 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
+
+from core.harness_log import harness_log
 
 ENV_SERVER_HOME = "UNITY_MCP_SERVER_HOME"
 ENV_AUTOSTART = "UNITY_MCP_AUTOSTART"
@@ -287,6 +289,7 @@ class UnityMcpServerSession:
                 continue
             host, port, _ = parse_http_endpoint(url)
             if is_tcp_port_open(host, port):
+                harness_log(f"Unity-MCP-Server [{name}] 已運行：{url}")
                 self._managed.append(
                     _ManagedProcess(name=name, url=url, process=None, started_by_harness=False)
                 )
@@ -300,6 +303,7 @@ class UnityMcpServerSession:
             if autostart_spec is None:
                 raise UnityMcpServerError(_connection_refused_hint(url, name))
 
+            harness_log(f"Unity-MCP-Server [{name}] port 未開，autostart 啟動中…")
             proc = _start_process(autostart_spec)
             self._managed.append(
                 _ManagedProcess(name=name, url=url, process=proc, started_by_harness=True)
@@ -310,3 +314,4 @@ class UnityMcpServerSession:
                     "請在本機終端機手動 dotnet run 查看錯誤。"
                 )
             wait_for_http_server(url, timeout_sec=autostart_spec.ready_timeout_sec)
+            harness_log(f"Unity-MCP-Server [{name}] 已就緒：{url}")

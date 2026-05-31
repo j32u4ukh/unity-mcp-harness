@@ -22,6 +22,7 @@ from unity_common import (
     resolve_unity_llm_model,
 )
 from build_workflow import run_build_plan
+from core.harness_log import configure_harness_log
 from core.cli_plan import (
     CLI_EPILOG,
     add_plan_cli_arguments,
@@ -137,6 +138,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="勿自動啟動 Unity-MCP-Server（HTTP 須已在本機運行）",
     )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="略過執行期進度日誌（預設會輸出任務 / LLM / MCP tool）",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="進度日誌含 MCP tool 回傳摘要",
+    )
     add_harness_llm_config_args(parser)
     return parser.parse_args()
 
@@ -204,6 +217,7 @@ def _print_results(results) -> None:
 
 def main() -> None:
     args = parse_args()
+    configure_harness_log(quiet=args.quiet, verbose=args.verbose)
     if args.init is not None:
         from core.scaffold.init_workspace import format_init_report, init_workspace
 

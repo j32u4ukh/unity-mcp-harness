@@ -14,6 +14,13 @@ from aicentral.mcp import MCPError
 
 from harness.mcp_runner import UnityMCPRunner, create_unity_mcp_runner
 
+from core.harness_log import (
+    harness_log,
+    log_prompt_excerpt,
+    log_task_end,
+    log_task_start,
+)
+from core.progress_hooks import harness_progress_hooks
 from core.pipeline.execution import get_next_runnable_task, harness_task_to_build_task, harness_tasks_by_id
 from core.pipeline.runner import HarnessTaskRunner
 from core.pipeline.schema import HarnessTask, TaskListDocument
@@ -50,8 +57,10 @@ def _run_single_task(
     harness_task: HarnessTask | None = None,
     resume: bool = False,
     pipeline_runner: HarnessTaskRunner | None = None,
+    task_index: int | None = None,
 ) -> TaskResult:
     """執行單一任務：UnityMCPRunner → aicentral Chat.with_mcp。"""
+    log_task_start(task.id, task.title, index=task_index)
     if pipeline_runner is not None:
         harness_task = pipeline_runner.on_task_start(task.id)
 
@@ -62,6 +71,7 @@ def _run_single_task(
         harness_task=harness_task,
         resume=resume,
     )
+    log_prompt_excerpt(prompt)
     try:
         if task.mcp_servers:
             reply = ask_unity(
@@ -88,6 +98,7 @@ def _run_single_task(
                 reply=reply,
             )
     except (MCPError, ProviderError) as exc:
+        harness_log(str(exc), level="ERROR")
         result = TaskResult(
             id=task.id,
             title=task.title,
@@ -98,6 +109,15 @@ def _run_single_task(
 
     if pipeline_runner is not None:
         pipeline_runner.on_task_end(task.id, result)
+        ht = pipeline_runner.get_task(task.id)
+        log_task_end(
+            task.id,
+            success=result.success,
+            verification=ht.verification,
+            error=result.error,
+        )
+    else:
+        log_task_end(task.id, success=result.success, error=result.error)
     return result
 
 
@@ -138,6 +158,7 @@ def _make_run_task_node(
             harness_task=ht,
             resume=state.get("resume", resume),
             pipeline_runner=pipeline_runner,
+            task_index=state.get("task_index", 0) + 1,
         )
         if pipeline_runner is not None:
             harness_by_id[task.id] = pipeline_runner.get_task(task.id)
@@ -260,7 +281,10 @@ def run_build_plan(
     }
     begin_session()
     try:
-        final = graph.invoke(initial)
+        with harness_progress_hooks():
+            harness_log("LangGraph 建構工作流開始")
+            final = graph.invoke(initial)
+            harness_log("LangGraph 建構工作流結束")
         return list(final.get("results", []))
     finally:
         end_session(flush=True)
