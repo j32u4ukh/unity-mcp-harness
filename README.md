@@ -80,8 +80,10 @@ unity-mcp-harness
 
 | 指令 | 說明 |
 |------|------|
-| `unity-mcp-harness` | 依 `task_list.yaml` 執行 Unity MCP 建構 |
-| `unity-mcp-harness --goals build` | 藍圖 → `task_list`（只規劃，不跑 Unity） |
+| `unity-mcp-harness` | 顯示入口速查（子指令說明） |
+| `unity-mcp-harness --goals build` | 藍圖 → `task_list`（只規劃） |
+| `unity-mcp-harness --tasks run` | 依 `task_list` 執行 Unity MCP 建構 |
+| `unity-mcp-harness --tasks modify` | 對話調整 `task_list` 任務描述 |
 | `unity-mcp-harness --init [ROOT]` | 初始化外部工作區（scaffold 範本 + scripts） |
 | `unity-mcp-chat` | **Unity 專案探索**（多輪 REPL；連線 MCP 查詢場景／資產現況） |
 | `unity-mcp-ask "問題"` | **Unity 專案探索**（單次；`--probe` 使用預設唯讀探查 prompt） |

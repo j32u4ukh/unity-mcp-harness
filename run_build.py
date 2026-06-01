@@ -25,7 +25,6 @@ from unity_common import (
     resolve_server_specs,
     resolve_unity_llm_model,
 )
-from build_workflow import run_build_plan
 from core.harness_log import configure_harness_log
 from core.cli_plan import (
     CLI_EPILOG,
@@ -33,17 +32,17 @@ from core.cli_plan import (
     print_deprecation_notices,
     resolve_plan_cli,
 )
-from core.mcp.server_lifecycle import UnityMcpServerSession
+from core.cli_entry import has_cli_action, print_harness_entry_help
 from core.cli_extended import (
-    EXECUTE_SECTION_12_TAG,
     run_chat_mode,
     run_goals_init,
     run_goals_modify,
     run_list_tools,
     run_status_update,
     run_sync_goals,
-    write_capabilities_marker,
+    run_tasks_modify,
 )
+from core.tasks_run import run_tasks_run
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,10 +65,14 @@ def parse_args() -> argparse.Namespace:
         nargs="?",
         const="build",
         choices=("build", "init", "modify"),
-        help=(
-            "藍圖模式：build=build_goals→task_list（只規劃）；"
-            "init/modify=對話編輯藍圖。不帶 --goals 則依 task_list 執行建構"
-        ),
+        help="藍圖：build=→task_list；init/modify=對話編輯 build_goals",
+    )
+    parser.add_argument(
+        "--tasks",
+        dest="tasks_mode",
+        choices=("run", "modify"),
+        metavar="run|modify",
+        help="執行隊列：run=執行 task_list；modify=對話調整 task_list",
     )
     ext = parser.add_argument_group("統一入口（EXECUTE §12）")
     ext.add_argument(
@@ -290,6 +293,10 @@ def main() -> None:
     args = parse_args()
     configure_harness_log(quiet=args.quiet, verbose=args.verbose)
 
+    if not has_cli_action(args):
+        print_harness_entry_help()
+        sys.exit(0)
+
     if getattr(args, "tools", None) is not None:
         as_json = args.tools == "json"
         sys.exit(run_list_tools(unity_config=args.unity_config, as_json=as_json))
@@ -331,6 +338,19 @@ def main() -> None:
                 unity_config_path=args.unity_config,
             )
         )
+
+    tasks_mode = getattr(args, "tasks_mode", None)
+    if tasks_mode == "modify":
+        sys.exit(
+            run_tasks_modify(
+                model=None,
+                aicentral_config=args.aicentral_config,
+                secret=args.secret,
+                unity_config_path=args.unity_config,
+            )
+        )
+    if tasks_mode == "run":
+        sys.exit(run_tasks_run(args))
 
     if args.init is not None:
         from core.scaffold.init_workspace import format_init_report, init_workspace
@@ -411,6 +431,9 @@ def main() -> None:
         return
 
     convert_only = goals_mode == "build" or plan_cli.sync_blueprint_only
+    if not convert_only:
+        print_harness_entry_help()
+        sys.exit(0)
 
     require_aicentral_config()
     try:
@@ -504,59 +527,6 @@ def main() -> None:
                 "\n（--goals build：build_goals → task_list 已完成，未執行 Unity MCP 建構）"
             )
         return
-
-    if args.dry_run:
-        print("\n（dry-run：未執行 Unity MCP 建構）")
-        return
-
-    register_unity_servers(specs, config_path=args.unity_config)
-
-    if args.verification_max_tool_rounds is not None:
-        if args.verification_max_tool_rounds < 1:
-            print("錯誤: --verification-max-tool-rounds 須 >= 1", file=sys.stderr)
-            sys.exit(2)
-        execution_plan.verification_max_tool_rounds = args.verification_max_tool_rounds
-
-    try:
-        with UnityMcpServerSession(
-            specs,
-            autostart=not args.no_autostart_mcp_server,
-        ):
-            results = run_build_plan(
-                execution_plan,
-                specs=specs,
-                unity_config_path=args.unity_config,
-                stop_on_error=not args.continue_on_error,
-                task_list=task_list,
-                task_list_path=task_list_path,
-                resume=resume,
-                skip_verification=args.skip_verification,
-                retry_failed=args.retry_failed,
-            )
-    except Exception as exc:
-        handle_errors(exc)
-        sys.exit(1)
-
-    if args.json:
-        final_doc = load_task_list(task_list_path) if task_list_path.is_file() else task_list
-        payload = _results_to_json_payload(results, task_list=final_doc)
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
-    else:
-        _print_results(results)
-
-    if task_list_path.is_file():
-        final_doc = load_task_list(task_list_path)
-        print("task_list 狀態（落盤後）:")
-        for t in final_doc.tasks:
-            ops = len(t.pipeline_records.operations_executed)
-            print(f"  [{t.id}] status={t.status} verification={t.verification} ops={ops}")
-
-    if results and not all(r.success for r in results):
-        sys.exit(1)
-
-    marker = write_capabilities_marker()
-    if goals_mode != "build" and not convert_only and not args.dry_run:
-        print(f"（{EXECUTE_SECTION_12_TAG} 能力已就緒；標記: {marker.name}）")
 
 
 if __name__ == "__main__":

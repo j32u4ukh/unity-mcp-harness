@@ -10,6 +10,7 @@ from typing import Any
 
 import yaml
 
+from core.dialogue_config import DIALOGUE_HISTORY_ENTRY_MAX_CHARS, DIALOGUE_HISTORY_MAX_ENTRIES
 from tasks import resolve_build_plan, resolve_goals_path
 from unity_common import (
     handle_errors,
@@ -90,6 +91,13 @@ class GoalsDialogueState:
 
     milestone: str | None = None
     history: list[str] = field(default_factory=list)
+
+    def append_history(self, role: str, text: str) -> None:
+        cap = DIALOGUE_HISTORY_ENTRY_MAX_CHARS
+        entry = f"{role}: {text[:cap]}{'…' if len(text) > cap else ''}"
+        self.history.append(entry)
+        if len(self.history) > DIALOGUE_HISTORY_MAX_ENTRIES:
+            self.history = self.history[-DIALOGUE_HISTORY_MAX_ENTRIES:]
 
     def note_milestone_from_user(self, text: str) -> bool:
         m = _MILESTONE_PATTERN.search(text)
@@ -214,11 +222,11 @@ def run_goals_dialogue_loop(
                 continue
 
         state.note_milestone_from_user(user_input)
-        state.history.append(f"使用者: {user_input}")
+        state.append_history("使用者", user_input)
         try:
             reply = _ask_with_boundary(chat, state, user_input)
             print(f"助理: {reply}\n")
-            state.history.append(f"助理: {reply[:3000]}")
+            state.append_history("助理", reply)
         except Exception as exc:
             handle_errors(exc)
     return 0

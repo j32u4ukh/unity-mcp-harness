@@ -4,4 +4,4 @@
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\_env.ps1"
 
-unity-mcp-harness @args
+unity-mcp-harness --tasks run @args

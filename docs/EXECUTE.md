@@ -175,12 +175,12 @@ PS planetary-malignamcy> .\scripts\harness-goals-to-task-list.ps1
 ### 6.5 依 task_list 執行建構
 
 ```powershell
-PS planetary-malignamcy> unity-mcp-harness
+PS planetary-malignamcy> unity-mcp-harness --tasks run
 # 或
 PS planetary-malignamcy> .\scripts\harness-run.ps1
 ```
 
-**不帶** `--goals` 才會連 Unity MCP。改藍圖後請先 `--goals build`，再執行本節指令。
+無參數的 `unity-mcp-harness` 只顯示入口說明。改藍圖後請先 `--goals build`，再 `--tasks run`。
 
 完整旗標說明見 [CLI.md](CLI.md)。
 
@@ -302,14 +302,15 @@ unity-mcp-harness --goals [build|init|modify]
 unity-mcp-harness --tasks [run|modify]
 ```
 
-- run: 執行 task_list.yaml 當中的任務，效果同原本的 `unity-mcp-harness`，原本的 `unity-mcp-harness` 應該印出類似 --help 的效果
+> **已實作**（2026-05）：無任何子指令時僅顯示入口速查（同 `unity-mcp-harness --help` 摘要）。
+
+- run: 執行 `task_list.yaml` 當中的 pending 任務（Unity MCP 建構）
 
 - modify: 開啟對話模式，針對 task_list.yaml 現有任務描述作調整。
-    - 印出目前的子目標描述，帶有編號方便後續討論
-    - 選擇要討論的子目標後，印出更多的描述，並和我討論該項目標有無問題，是否該細分等
-    - 會對現有 task_list.yaml 的子目標做增減或調整描述
-    - 不會直接覆蓋整個 task_list.yaml
-    - 一樣應具備調用 MCP 的能力，針對專案實際情況進行討論
+    - **啟動時載入完整 task_list.yaml** 至上下文
+    - 討論中助理輸出的 ```yaml tasks``` 會累積為**修改草案**（`/draft` 可查看）
+    - **`/write` 僅將最後一份草案合併寫入**（保留 status / pipeline_records），不會在 /write 時另起 LLM 重寫
+    - 具備 MCP 唯讀查證（`/mcp`）
 
 ```
 unity-mcp-harness --tools

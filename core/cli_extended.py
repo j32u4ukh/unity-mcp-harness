@@ -33,6 +33,12 @@ from core.goals_dialogue import (
     GoalsDialogueState,
     run_goals_dialogue_loop,
 )
+from core.tasks_dialogue import (
+    TASKS_MODIFY_SYSTEM,
+    TasksModifyState,
+    load_tasks_modify_system_context,
+    run_tasks_modify_dialogue,
+)
 from core.mcp.server_lifecycle import UnityMcpServerError, UnityMcpServerSession
 
 CAPABILITIES_MARKER_FILE = "harness_capabilities.marker"
@@ -390,6 +396,54 @@ def run_goals_modify(
     )
 
 
+def run_tasks_modify(
+    *,
+    model: str | None,
+    aicentral_config: str | None,
+    secret: str | None,
+    unity_config_path: str | None = None,
+    task_list_path: Path | str | None = None,
+    no_mcp: bool = False,
+) -> int:
+    """對話調整 task_list 規劃欄位（合併寫回，保留執行期狀態）。"""
+    require_aicentral_config(aicentral_config=aicentral_config, secret=secret)
+    path = Path(task_list_path) if task_list_path else default_task_list_path()
+    print(f"執行隊列：{path.resolve()}")
+    if not path.is_file():
+        print(f"錯誤: 找不到 {path}，請先 --goals build。", file=sys.stderr)
+        return 1
+    try:
+        doc = load_task_list(path)
+    except (ValueError, OSError) as exc:
+        handle_errors(exc)
+        return 1
+
+    system = TASKS_MODIFY_SYSTEM + "\n\n" + load_tasks_modify_system_context(doc, path=path)
+    state_seed = TasksModifyState()
+
+    def _dialogue(chat, state: GoalsDialogueState, *, mcp_available: bool) -> int:
+        if not isinstance(state, TasksModifyState):
+            state = state_seed
+        if state_seed.milestone and not state.milestone:
+            state.milestone = state_seed.milestone
+        return run_tasks_modify_dialogue(
+            chat,
+            doc=doc,
+            path=path,
+            state=state,
+            mcp_available=mcp_available,
+        )
+
+    return _run_goals_with_mcp(
+        unity_config_path=unity_config_path,
+        model=model,
+        system=system,
+        dialogue_fn=_dialogue,
+        initial_state=state_seed,
+        no_mcp=no_mcp,
+    )
+
+
 def run_goals_build_mode() -> int:
-    """build 模式由 run_build 主流程處理（等同預設建構/規劃）。"""
+    """build 模式由 run_build 主流程處理。"""
     return -1  # sentinel: continue main

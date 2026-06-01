@@ -10,11 +10,12 @@
 
 | 參數 | 說明 |
 |------|------|
-| `--goals build` | `build_goals.yaml` → Plan Normalize → `task_list.yaml`（**只規劃**） |
-| `--goals init` | 對話建立 `build_goals.yaml`（`/write` 覆寫） |
-| `--goals modify` | 對話調整既有 tasks（`/write` 只更新 tasks） |
+| （無子指令） | 顯示入口速查 |
+| `--goals build` | `build_goals.yaml` → `task_list.yaml`（只規劃） |
+| `--goals init` / `modify` | 對話編輯藍圖 |
+| `--tasks run` | 執行 `task_list.yaml`（Unity MCP） |
+| `--tasks modify` | 對話調整 `task_list`（`/write` 合併寫回） |
 | `-g` / `--goals-file` | 藍圖路徑 |
-| （無 `--goals`） | 依 `task_list.yaml` 執行 Unity MCP 建構 |
 | `--tools` / `--tools json` | 列出 MCP 工具 |
 | `--chat` | 探索 REPL |
 | `--sync` | `task_list` → `build_goals` |
@@ -31,8 +32,9 @@
 
 | 指令 | 做什麼 | 會跑 Unity MCP？ |
 |------|--------|------------------|
+| `unity-mcp-harness` | 入口速查 | 否 |
 | `unity-mcp-harness --goals build` | 藍圖 → `task_list` | 否 |
-| `unity-mcp-harness` | 執行 pending 任務（藍圖與隊列 id 不一致時會自動重算隊列） | 是 |
+| `unity-mcp-harness --tasks run` | 執行 pending 任務 | 是 |
 
 **順序阻擋**：若依 priority 排序的前置任務為 `failed`，後續 `pending` / `in_progress` **不會執行**，直到 `--retry-failed` 重試該 failed 項。
 
@@ -54,7 +56,7 @@
 unity-mcp-harness --goals build
 
 # 2. 執行建構
-unity-mcp-harness
+unity-mcp-harness --tasks run
 ```
 
 ## 舊參數（仍可用，會印警告 → 等同 `--goals build`，**不會**再自動執行建構）

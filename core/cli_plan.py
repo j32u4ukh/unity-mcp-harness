@@ -144,17 +144,18 @@ def resolve_plan_cli(args: argparse.Namespace) -> PlanCliFlags:
 
 
 CLI_EPILOG = """
-EXECUTE §12 統一入口:
-  unity-mcp-harness --goals build     ← build_goals.yaml → task_list.yaml（只規劃）
+EXECUTE §12 統一入口（無參數時顯示速查）:
+  unity-mcp-harness --goals build     ← build_goals → task_list
   unity-mcp-harness --goals init|modify
-  unity-mcp-harness                   ← 依 task_list 執行 Unity MCP（不會自動重規劃）
+  unity-mcp-harness --tasks run       ← 執行 task_list（Unity MCP）
+  unity-mcp-harness --tasks modify   ← 討論累積草案，/write 合併寫入
   unity-mcp-harness --tools [--tools json]
   unity-mcp-harness --chat
-  unity-mcp-harness --sync            ← task_list → build_goals
+  unity-mcp-harness --sync
   unity-mcp-harness --status
 
 常見流程:
   1. 編輯 build_goals.yaml
   2. unity-mcp-harness --goals build
-  3. unity-mcp-harness
+  3. unity-mcp-harness --tasks run
 """
