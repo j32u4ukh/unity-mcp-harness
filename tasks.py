@@ -182,24 +182,40 @@ def load_build_plan(path: Path | str) -> BuildPlan:
     return plan
 
 
-def resolve_build_plan(*, plan_path: Path | str | None = None) -> BuildPlan:
-    """解析建構檔路徑（參數 > 環境變數 > 本目錄 build_goals.yaml > example）。"""
+def resolve_goals_path(plan_path: Path | str | None = None) -> Path:
+    """解析 ``build_goals.yaml`` 路徑（參數 > 環境變數 > 工作區 > 套件範例）。"""
     import os
 
     if plan_path is not None:
-        return load_build_plan(plan_path)
+        return Path(plan_path).expanduser().resolve()
 
     env = os.environ.get(ENV_GOALS_PATH, "").strip()
     if env:
-        return load_build_plan(env)
+        return Path(env).expanduser().resolve()
 
-    local = project_root() / LOCAL_GOALS_FILE
+    from unity_common import project_root, workspace_root
+
+    local = workspace_root() / LOCAL_GOALS_FILE
     if local.is_file():
-        return load_build_plan(local)
+        return local
+    pkg = project_root() / LOCAL_GOALS_FILE
+    if pkg.is_file() and pkg != local:
+        return pkg
+    return local
 
-    example = project_root() / "build_goals.example.yaml"
-    if example.is_file():
-        return load_build_plan(example)
+
+def resolve_build_plan(*, plan_path: Path | str | None = None) -> BuildPlan:
+    """解析建構檔並載入（參數 > 環境變數 > 工作區 build_goals.yaml > example）。"""
+    path = resolve_goals_path(plan_path)
+    if path.is_file():
+        return load_build_plan(path)
+
+    from unity_common import project_root, workspace_root
+
+    for root in (workspace_root(), project_root()):
+        example = root / "build_goals.example.yaml"
+        if example.is_file():
+            return load_build_plan(example)
 
     raise FileNotFoundError(
         f"找不到 {LOCAL_GOALS_FILE}；請複製 build_goals.example.yaml 並編輯任務"

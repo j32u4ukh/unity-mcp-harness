@@ -12,9 +12,9 @@ TASK_LIST_FILENAME = "task_list.yaml"
 
 
 def default_task_list_path() -> Path:
-    from unity_common import project_root
+    from unity_common import workspace_root
 
-    return project_root() / TASK_LIST_FILENAME
+    return workspace_root() / TASK_LIST_FILENAME
 
 
 def load_task_list(path: Path | str | None = None) -> TaskListDocument:

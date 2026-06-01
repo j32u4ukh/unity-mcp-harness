@@ -158,41 +158,29 @@ PS unity-mcp-harness> unity-mcp-harness --json
 PS unity-mcp-harness> unity-mcp-harness --retry-failed
 ```
 
-### 6.4 藍圖 → 只更新 task_list（不跑 Unity）
+### 6.4 藍圖 → task_list（只規劃，不跑 Unity）
 
 ```powershell
+PS planetary-malignamcy> unity-mcp-harness --goals build
+# 或
 PS planetary-malignamcy> .\scripts\harness-goals-to-task-list.ps1
+```
+
+來源：`build_goals.yaml` → 目標：`task_list.yaml`（保留仍對應藍圖 id 的 `completed` 紀錄）。
+
+預覽不寫檔：`unity-mcp-harness --goals build --dry-run`
+
+若要把 **`task_list` 的規劃欄位** 寫回藍圖：`unity-mcp-harness --sync --backup`
+
+### 6.5 依 task_list 執行建構
+
+```powershell
+PS planetary-malignamcy> unity-mcp-harness
 # 或
-PS unity-mcp-harness> unity-mcp-harness --goals-to-task-list
+PS planetary-malignamcy> .\scripts\harness-run.ps1
 ```
 
-來源：`build_goals.yaml` → 目標：`task_list.yaml`（保留 `completed` 的執行紀錄）。
-
-若要把 **`task_list` 的規劃欄位** 寫回藍圖（單獨指令，不必先 `--goals-to-task-list`）：
-
-```powershell
-.\scripts\harness-export-goals-from-task-list.ps1 -Backup
-# 或
-unity-mcp-harness --export-goals-from-task-list --backup
-```
-
-改藍圖後先同步隊列再寫回：
-
-```powershell
-unity-mcp-harness --goals-to-task-list --export-goals-from-task-list --backup
-```
-
-### 6.5 重算隊列並執行建構
-
-```powershell
-PS unity-mcp-harness> unity-mcp-harness --replan-and-run
-```
-
-等同舊版 `--replan`（規劃後**會**連 Unity）。若只要將 **Normalize 結果** 寫回藍圖：
-
-```powershell
-unity-mcp-harness --replan-and-run --export-goals-from-normalize --backup
-```
+**不帶** `--goals` 才會連 Unity MCP。改藍圖後請先 `--goals build`，再執行本節指令。
 
 完整旗標說明見 [CLI.md](CLI.md)。
 
@@ -310,6 +298,18 @@ unity-mcp-harness --goals [build|init|modify]
     - 會對現有 build_goals.yaml 的子目標做增減或調整描述
     - 不會直接覆蓋整個 build_goals.yaml
 
+```
+unity-mcp-harness --tasks [run|modify]
+```
+
+- run: 執行 task_list.yaml 當中的任務，效果同原本的 `unity-mcp-harness`，原本的 `unity-mcp-harness` 應該印出類似 --help 的效果
+
+- modify: 開啟對話模式，針對 task_list.yaml 現有任務描述作調整。
+    - 印出目前的子目標描述，帶有編號方便後續討論
+    - 選擇要討論的子目標後，印出更多的描述，並和我討論該項目標有無問題，是否該細分等
+    - 會對現有 task_list.yaml 的子目標做增減或調整描述
+    - 不會直接覆蓋整個 task_list.yaml
+    - 一樣應具備調用 MCP 的能力，針對專案實際情況進行討論
 
 ```
 unity-mcp-harness --tools

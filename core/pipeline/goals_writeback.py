@@ -10,7 +10,6 @@ import yaml
 
 from core.pipeline.schema import HarnessTask, NormalizedPlan, NormalizedTask, TaskListDocument
 from tasks import LOCAL_GOALS_FILE
-from unity_common import project_root
 
 
 def _task_to_goals_entry(task: NormalizedTask) -> dict[str, Any]:
@@ -63,7 +62,9 @@ def write_back_build_goals(
     backup: bool = False,
 ) -> Path:
     """合併寫回藍圖 ``tasks``；不修改 goal / system_context 等頂層欄位。"""
-    path = Path(goals_path) if goals_path is not None else project_root() / LOCAL_GOALS_FILE
+    from tasks import resolve_goals_path
+
+    path = resolve_goals_path(goals_path)
     if not path.is_file():
         raise FileNotFoundError(f"找不到 build_goals: {path}")
 
@@ -94,7 +95,9 @@ def write_back_task_list_goals(
     backup: bool = False,
 ) -> Path:
     """將 ``task_list`` 中規劃欄位寫回藍圖（排除 actual/verification）。"""
-    path = Path(goals_path) if goals_path is not None else project_root() / LOCAL_GOALS_FILE
+    from tasks import resolve_goals_path
+
+    path = resolve_goals_path(goals_path)
     if not path.is_file():
         raise FileNotFoundError(f"找不到 build_goals: {path}")
 

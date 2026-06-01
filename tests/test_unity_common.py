@@ -27,6 +27,7 @@ from unity_common import (
     resolve_unity_llm_model,
     task_failure_summary,
     task_reply_indicates_failure,
+    workspace_root,
 )
 
 
@@ -51,6 +52,7 @@ def test_resolve_aicentral_config_dir_defaults_to_project_config(
 ) -> None:
     monkeypatch.delenv(ENV_AICENTRAL_HOME, raising=False)
     monkeypatch.setattr("unity_common.project_root", lambda: tmp_path)
+    monkeypatch.setattr("unity_common.workspace_root", lambda: tmp_path)
     assert resolve_aicentral_config_dir() == (tmp_path / "config").resolve()
 
 
@@ -154,6 +156,7 @@ def test_resolve_server_specs_from_file(tmp_path: Path, monkeypatch: pytest.Monk
         encoding="utf-8",
     )
     monkeypatch.setattr("unity_common.project_root", lambda: tmp_path)
+    monkeypatch.setattr("unity_common.workspace_root", lambda: tmp_path)
     monkeypatch.delenv("UNITY_MCP_CONFIG", raising=False)
     monkeypatch.delenv("UNITY_MCP_URL", raising=False)
     specs = resolve_server_specs()
@@ -202,6 +205,7 @@ def test_bootstrap_uses_harness_config_dir(tmp_path: Path, monkeypatch: pytest.M
         encoding="utf-8",
     )
     monkeypatch.setattr("unity_common.project_root", lambda: tmp_path)
+    monkeypatch.setattr("unity_common.workspace_root", lambda: tmp_path)
 
     bootstrap_aicentral_config()
     assert config_dir() == cfg.resolve()

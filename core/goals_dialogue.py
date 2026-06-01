@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from tasks import LOCAL_GOALS_FILE, resolve_build_plan
+from tasks import resolve_build_plan, resolve_goals_path
 from unity_common import (
     handle_errors,
     project_root,
@@ -120,7 +120,7 @@ def _load_auxiliary_context() -> str:
     except Exception:
         pass
 
-    goals_path = project_root() / LOCAL_GOALS_FILE
+    goals_path = resolve_goals_path()
     if goals_path.is_file():
         try:
             plan = resolve_build_plan(plan_path=goals_path)

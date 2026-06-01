@@ -1,8 +1,9 @@
-# 重算 task_list 並預覽（等同 --replan-and-run --dry-run，不連 Unity 建構）
+# 預覽 build_goals → task_list（不連 Unity、不寫入除非去掉 --dry-run）
 # Usage: .\scripts\harness-replan.ps1
-# 重算後立刻開工: unity-mcp-harness --replan-and-run
+# 實際寫入隊列: unity-mcp-harness --goals build
+# 寫入後執行建構: unity-mcp-harness
 
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\_env.ps1"
 
-unity-mcp-harness --replan-and-run --dry-run @args
+unity-mcp-harness --goals build --dry-run @args

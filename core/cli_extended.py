@@ -15,7 +15,7 @@ from core.pipeline.store import default_task_list_path, load_task_list
 from core.project_state.bootstrap import format_bootstrap_report, run_bootstrap_state
 from core.project_state.paths import default_project_state_root
 from core.project_state.ssot import sync_project_state_from_task_list
-from tasks import LOCAL_GOALS_FILE, resolve_build_plan
+from tasks import resolve_build_plan, resolve_goals_path
 from unity_common import (
     handle_errors,
     list_unity_tools,
@@ -25,14 +25,24 @@ from unity_common import (
     resolve_server_specs,
     resolve_unity_llm_model,
 )
-from core.mcp.server_lifecycle import UnityMcpServerSession
+from core.goals_dialogue import (
+    GOALS_INIT_HELP,
+    GOALS_INIT_SYSTEM,
+    GOALS_MODIFY_HELP,
+    GOALS_MODIFY_SYSTEM,
+    GoalsDialogueState,
+    run_goals_dialogue_loop,
+)
+from core.mcp.server_lifecycle import UnityMcpServerError, UnityMcpServerSession
 
 CAPABILITIES_MARKER_FILE = "harness_capabilities.marker"
 EXECUTE_SECTION_12_TAG = "HARNESS_EXECUTE_12_IMPLEMENTED"
 
 
 def capabilities_marker_path() -> Path:
-    return project_root() / "config" / CAPABILITIES_MARKER_FILE
+    from unity_common import workspace_root
+
+    return workspace_root() / "config" / CAPABILITIES_MARKER_FILE
 
 
 def write_capabilities_marker() -> Path:
@@ -176,9 +186,7 @@ def _extract_yaml_block(text: str) -> dict[str, Any]:
 
 
 def _goals_path(goals_file: str | None) -> Path:
-    if goals_file:
-        return Path(goals_file)
-    return project_root() / LOCAL_GOALS_FILE
+    return resolve_goals_path(goals_file)
 
 
 def _print_numbered_tasks(plan) -> None:
@@ -204,7 +212,7 @@ def _run_goals_with_mcp(
 ) -> int:
     """在 Unity MCP 連線下執行 goals 對話（no_mcp 僅供測試）。"""
     from aicentral import Chat
-    from core.goals_dialogue import GoalsDialogueState
+    from core.goals_dialogue import _create_mcp_chat
 
     state = initial_state if initial_state is not None else GoalsDialogueState()
 
@@ -215,8 +223,6 @@ def _run_goals_with_mcp(
     specs = resolve_server_specs(config_path=unity_config_path)
     try:
         with UnityMcpServerSession(specs, autostart=True):
-            from core.goals_dialogue import _create_mcp_chat
-
             chat = _create_mcp_chat(
                 system=system,
                 model=model,
@@ -224,9 +230,7 @@ def _run_goals_with_mcp(
                 specs=specs,
                 max_tool_rounds=12,
             )
-            print("（已連線 Unity MCP — 討論現有專案內容時將以唯讀工具查證）")
-            return dialogue_fn(chat, state, mcp_available=True)
-    except Exception as exc:
+    except (UnityMcpServerError, OSError, ConnectionError) as exc:
         print(
             f"警告: Unity MCP 無法連線（{exc}），改為無 MCP 模式；"
             "討論現況可能不準確。可用 /mcp 在連線恢復後重試。",
@@ -234,6 +238,9 @@ def _run_goals_with_mcp(
         )
         chat = Chat.stateless(system=system, model=resolve_unity_llm_model(model))
         return dialogue_fn(chat, state, mcp_available=False)
+
+    print("（已連線 Unity MCP — 討論現有專案內容時將以唯讀工具查證）")
+    return dialogue_fn(chat, state, mcp_available=True)
 
 
 def run_goals_init(
@@ -246,10 +253,9 @@ def run_goals_init(
     no_mcp: bool = False,
 ) -> int:
     """對話建立 build_goals.yaml（收斂澄清 + MCP 查證）。"""
-    from core.goals_dialogue import GOALS_INIT_HELP, GOALS_INIT_SYSTEM, GoalsDialogueState
-
     require_aicentral_config(aicentral_config=aicentral_config, secret=secret)
     path = _goals_path(goals_file)
+    print(f"藍圖檔：{path}")
 
     def _dialogue(chat, state: GoalsDialogueState, *, mcp_available: bool) -> int:
         print("【--goals init】定義里程碑與子目標（收斂於里程碑邊界內）。")
@@ -301,10 +307,9 @@ def run_goals_modify(
     no_mcp: bool = False,
 ) -> int:
     """對話調整既有 build_goals tasks（收斂 + MCP）。"""
-    from core.goals_dialogue import GOALS_MODIFY_HELP, GOALS_MODIFY_SYSTEM, GoalsDialogueState
-
     require_aicentral_config(aicentral_config=aicentral_config, secret=secret)
     path = _goals_path(goals_file)
+    print(f"藍圖檔：{path}")
     if not path.is_file():
         print(f"錯誤: 找不到 {path}，請先 --goals init 或手動建立。", file=sys.stderr)
         return 1

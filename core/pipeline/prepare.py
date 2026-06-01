@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from core.pipeline.blueprint_sync import task_list_matches_blueprint
 from core.pipeline.bootstrap import ensure_task_list
 from core.pipeline.goals_writeback import write_back_build_goals
 from core.pipeline.plan_normalize import normalize_plan, normalize_plan_passthrough_enriched
@@ -61,8 +62,8 @@ def prepare_harness_queue(
     *,
     goals_path: Path | str | None = None,
     skip_plan_normalize: bool = False,
-    replan: bool = False,
-    init_tasks: bool = False,
+    force_sync_from_blueprint: bool = False,
+    dry_run: bool = False,
     write_back_goals: bool = False,
     backup_goals: bool = False,
     plan_with_mcp: bool = False,
@@ -74,13 +75,22 @@ def prepare_harness_queue(
     """
     載入藍圖 →（可選）LLM 規範化 →（可選）寫回藍圖 → bootstrap/載入 task_list。
 
-    - 無 ``task_list.yaml``、``--replan`` 或 ``--init-tasks`` 時會 bootstrap 並落盤。
+    - ``force_sync_from_blueprint``（``--goals build``）：一律 normalize 並寫入 task_list。
+    - 執行模式：無 task_list、或藍圖任務 id 與隊列不一致時才 bootstrap。
     - 否則沿用既有 ``task_list``（不重新 normalize）。
     """
     build_plan = resolve_build_plan(plan_path=goals_path)
     task_path = default_task_list_path()
     had_task_list = task_path.is_file()
-    need_bootstrap = (not had_task_list) or replan or init_tasks
+    goals_drift = False
+    if had_task_list and not force_sync_from_blueprint:
+        from core.pipeline.store import load_task_list
+
+        existing_for_check = load_task_list(task_path)
+        goals_drift = not task_list_matches_blueprint(build_plan, existing_for_check)
+
+    need_bootstrap = (not had_task_list) or force_sync_from_blueprint or goals_drift
+    replan_write = force_sync_from_blueprint or not had_task_list or goals_drift
 
     if need_bootstrap:
         if skip_plan_normalize:
@@ -92,12 +102,13 @@ def prepare_harness_queue(
         else:
             existing_revision = 1
             task_list_for_plan: TaskListDocument | None = None
-            if had_task_list and replan:
+            if had_task_list and (force_sync_from_blueprint or goals_drift):
                 from core.pipeline.store import load_task_list
 
-                task_list_for_plan = load_task_list(task_path)
-                existing_revision = task_list_for_plan.plan_revision + 1
-                _sync_project_state_from_doc(task_list_for_plan)
+                existing_for_check = load_task_list(task_path)
+                existing_revision = existing_for_check.plan_revision + 1
+                if force_sync_from_blueprint:
+                    _sync_project_state_from_doc(existing_for_check)
             normalized = normalize_plan(
                 build_plan,
                 plan_revision=existing_revision,
@@ -108,16 +119,30 @@ def prepare_harness_queue(
                 unity_config_path=unity_config_path,
                 task_list_doc=task_list_for_plan,
             )
-        if write_back_goals:
+        if write_back_goals and not dry_run:
             write_back_build_goals(normalized, goals_path, backup=backup_goals)
+        if goals_drift and not force_sync_from_blueprint:
+            drift_note = "偵測 build_goals 與 task_list 任務 id 不一致，已重新 bootstrap"
+            changelog = normalized.plan_changelog
+            if changelog:
+                changelog = f"{changelog}；{drift_note}"
+            else:
+                changelog = drift_note
+            normalized = NormalizedPlan(
+                normalized_tasks=normalized.normalized_tasks,
+                plan_changelog=changelog,
+                plan_revision=normalized.plan_revision,
+                source_plan=normalized.source_plan,
+            )
         task_list = ensure_task_list(
             normalized,
             project_name=build_plan.project,
             path=task_path,
-            replan=replan or init_tasks or not had_task_list,
+            replan=replan_write,
             preserve_completed=True,
+            dry_run=dry_run,
         )
-        created = True
+        created = not dry_run
     else:
         from core.pipeline.store import load_task_list, save_task_list
         from core.pipeline.verify_hints import backfill_task_list_verify_hints

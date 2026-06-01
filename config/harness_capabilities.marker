@@ -5,6 +5,4 @@ features:
 - --chat
 - --sync
 - --status
-notes: |
-  舊 unity-mcp-list-tools / unity-mcp-chat 仍可用；建議改用統一入口 unity-mcp-harness。
-  --goals init/modify：收斂式澄清 + Unity MCP 唯讀查證（2026-05 強化）。
+notes: 舊 unity-mcp-list-tools / unity-mcp-chat 仍可用；建議改用統一入口。

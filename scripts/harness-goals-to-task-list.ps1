@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\_env.ps1"
 
-$extra = @("--goals-to-task-list")
+$extra = @("--goals", "build")
 if ($ExportGoalsFromTaskList) {
     $extra += "--export-goals-from-task-list"
 }

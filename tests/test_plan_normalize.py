@@ -188,7 +188,9 @@ def test_prepare_harness_skip_normalize_uses_passthrough(tmp_path: Path) -> None
     task_path = tmp_path / "task_list.yaml"
     with patch("core.pipeline.prepare.resolve_build_plan", return_value=plan):
         with patch("core.pipeline.prepare.default_task_list_path", return_value=task_path):
-            result = prepare_harness_queue(skip_plan_normalize=True, init_tasks=True)
+            result = prepare_harness_queue(
+                skip_plan_normalize=True, force_sync_from_blueprint=True
+            )
     assert len(result.normalized.normalized_tasks) == 2
     assert result.created_task_list is True
     assert task_path.is_file()

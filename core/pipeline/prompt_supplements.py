@@ -17,9 +17,9 @@ DEFAULT_SUPPLEMENTS_FILENAME = "prompt_supplements.json"
 
 
 def default_supplements_path() -> Path:
-    from unity_common import project_root
+    from unity_common import workspace_root
 
-    return project_root() / "config" / DEFAULT_SUPPLEMENTS_FILENAME
+    return workspace_root() / "config" / DEFAULT_SUPPLEMENTS_FILENAME
 
 
 @dataclass

@@ -52,8 +52,9 @@ def ensure_task_list(
     path=None,
     replan: bool = False,
     preserve_completed: bool = True,
+    dry_run: bool = False,
 ) -> TaskListDocument:
-    """若需建立/更新 task_list 則 bootstrap 並落盤；否則載入既有檔案。"""
+    """若需建立/更新 task_list 則 bootstrap 並落盤；``dry_run`` 時僅記憶體預覽不寫檔。"""
     target = path or default_task_list_path()
     existing: TaskListDocument | None = None
     if target.is_file():
@@ -66,7 +67,8 @@ def ensure_task_list(
             existing=existing if replan else None,
             preserve_completed=preserve_completed and replan,
         )
-        save_task_list(doc, target)
+        if not dry_run:
+            save_task_list(doc, target)
         return doc
 
     return existing

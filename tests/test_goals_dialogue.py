@@ -32,6 +32,47 @@ def test_modify_system_convergence() -> None:
     assert "唯讀" in GOALS_MODIFY_SYSTEM
 
 
+def test_run_goals_modify_no_mcp_does_not_name_error(tmp_path, monkeypatch) -> None:
+    """regression: run_goals_dialogue_loop 必須已 import（#modify NameError）。"""
+    import yaml
+    from core.cli_extended import run_goals_modify
+
+    goals = tmp_path / "build_goals.yaml"
+    goals.write_text(
+        yaml.safe_dump(
+            {
+                "project": "P",
+                "goal": "測試目標",
+                "mcp_servers": ["unity"],
+                "tasks": [
+                    {
+                        "id": "t1",
+                        "title": "T",
+                        "objective": "o",
+                        "prompt": "p",
+                    }
+                ],
+            },
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("UNITY_MCP_HOME", str(tmp_path))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "/quit")
+    monkeypatch.setattr("core.cli_extended.require_aicentral_config", lambda **_: None)
+
+    assert (
+        run_goals_modify(
+            goals_file=str(goals),
+            model=None,
+            aicentral_config=None,
+            secret=None,
+            no_mcp=True,
+        )
+        == 0
+    )
+
+
 def test_ask_with_boundary_mcp_command() -> None:
     class _FakeChat:
         last_prompt = ""

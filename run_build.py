@@ -66,7 +66,10 @@ def parse_args() -> argparse.Namespace:
         nargs="?",
         const="build",
         choices=("build", "init", "modify"),
-        help="藍圖模式：build=預設建構/規劃、init=對話建立藍圖、modify=對話調整藍圖",
+        help=(
+            "藍圖模式：build=build_goals→task_list（只規劃）；"
+            "init/modify=對話編輯藍圖。不帶 --goals 則依 task_list 執行建構"
+        ),
     )
     ext = parser.add_argument_group("統一入口（EXECUTE §12）")
     ext.add_argument(
@@ -307,7 +310,7 @@ def main() -> None:
             )
         )
 
-    goals_mode = getattr(args, "goals_mode", None) or "build"
+    goals_mode = getattr(args, "goals_mode", None)
     if goals_mode == "init":
         sys.exit(
             run_goals_init(
@@ -392,7 +395,7 @@ def main() -> None:
         try:
             task_list = load_task_list(task_list_path)
         except FileNotFoundError as exc:
-            print(f"錯誤: {exc}\n請先執行 --goals-to-task-list 或 --replan-and-run 建立 task_list。", file=sys.stderr)
+            print(f"錯誤: {exc}\n請先執行 unity-mcp-harness --goals build 建立 task_list。", file=sys.stderr)
             sys.exit(1)
         except (ValueError, OSError) as exc:
             handle_errors(exc)
@@ -407,19 +410,26 @@ def main() -> None:
         print(f"（--export-goals-from-task-list：已將 task_list 規劃欄位寫回 {out}）")
         return
 
+    convert_only = goals_mode == "build" or plan_cli.sync_blueprint_only
+
     require_aicentral_config()
     try:
         from core.harness_log import log_prepare_phase
         from core.progress_hooks import harness_progress_hooks
 
         specs = resolve_server_specs(config_path=args.unity_config)
-        log_prepare_phase("載入 build_goals / Plan Normalize / bootstrap task_list")
+        phase = (
+            "build_goals → task_list（規劃）"
+            if convert_only
+            else "載入 task_list / 必要時同步藍圖"
+        )
+        log_prepare_phase(phase)
         with harness_progress_hooks():
             prepared = prepare_harness_queue(
                 goals_path=_resolve_goals_path(args),
                 skip_plan_normalize=args.skip_plan_normalize,
-                replan=plan_cli.need_replan,
-                init_tasks=False,
+                force_sync_from_blueprint=convert_only,
+                dry_run=args.dry_run,
                 write_back_goals=plan_cli.write_back_in_prepare,
                 backup_goals=args.backup,
                 plan_with_mcp=args.plan_with_mcp,
@@ -446,11 +456,16 @@ def main() -> None:
         sys.exit(1)
 
     model = resolve_unity_llm_model(plan.model)
+    banner_detail = (
+        "build_goals → Plan Normalize → task_list"
+        if convert_only
+        else "依 task_list.yaml 執行 Unity MCP 建構"
+    )
     print_banner(
         title="Unity 建構工作流（Harness + LangGraph）",
         model=model,
         server_names=plan.mcp_servers,
-        detail="藍圖 build_goals → Plan Normalize → task_list → Unity MCP 執行",
+        detail=banner_detail,
         specs=specs,
         interactive=False,
     )
@@ -474,7 +489,7 @@ def main() -> None:
         else:
             print("\n（無待執行任務：全部 completed / skipped）")
 
-    if plan_cli.goals_to_task_list:
+    if convert_only:
         if plan_cli.export_goals_from_task_list:
             write_back_task_list_goals(
                 task_list, _resolve_goals_path(args), backup=args.backup
@@ -482,9 +497,12 @@ def main() -> None:
             print("（已將 task_list 規劃欄位寫回 build_goals.yaml）")
         if plan_cli.export_goals_from_normalize and not plan_cli.write_back_in_prepare:
             print("（已於規劃階段將 Normalize 結果寫回 build_goals.yaml）")
-        print(
-            "\n（--goals-to-task-list：build_goals → task_list 已完成，未執行 Unity MCP 建構）"
-        )
+        if args.dry_run:
+            print("\n（dry-run：已預覽規劃結果，未寫入 task_list / 未執行 Unity MCP）")
+        else:
+            print(
+                "\n（--goals build：build_goals → task_list 已完成，未執行 Unity MCP 建構）"
+            )
         return
 
     if args.dry_run:
@@ -537,7 +555,7 @@ def main() -> None:
         sys.exit(1)
 
     marker = write_capabilities_marker()
-    if goals_mode == "build" and not plan_cli.goals_to_task_list and not args.dry_run:
+    if goals_mode != "build" and not convert_only and not args.dry_run:
         print(f"（{EXECUTE_SECTION_12_TAG} 能力已就緒；標記: {marker.name}）")
 
 

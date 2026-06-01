@@ -14,9 +14,9 @@ def project_state_dir_name() -> str:
 
 
 def default_project_state_root() -> Path:
-    from unity_common import project_root
+    from unity_common import workspace_root
 
-    return project_root() / PROJECT_STATE_DIR
+    return workspace_root() / PROJECT_STATE_DIR
 
 
 def index_path(root: Path | None = None) -> Path:

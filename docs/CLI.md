@@ -10,10 +10,11 @@
 
 | 參數 | 說明 |
 |------|------|
+| `--goals build` | `build_goals.yaml` → Plan Normalize → `task_list.yaml`（**只規劃**） |
 | `--goals init` | 對話建立 `build_goals.yaml`（`/write` 覆寫） |
 | `--goals modify` | 對話調整既有 tasks（`/write` 只更新 tasks） |
-| `--goals` / `--goals build` | 預設建構流程（同無旗標） |
-| `-g` / `--goals-file` | 藍圖路徑（原 `-g` 改為 `--goals-file`） |
+| `-g` / `--goals-file` | 藍圖路徑 |
+| （無 `--goals`） | 依 `task_list.yaml` 執行 Unity MCP 建構 |
 | `--tools` / `--tools json` | 列出 MCP 工具 |
 | `--chat` | 探索 REPL |
 | `--sync` | `task_list` → `build_goals` |
@@ -26,86 +27,47 @@
 | `build_goals.yaml` | 人類維護的**藍圖**（意圖、粗任務） |
 | `task_list.yaml` | 執行期 **SSOT**（狀態、`pipeline_records`、`verification`） |
 
-## 規劃與執行（新參數）
+## 規劃與執行
 
-| 參數 | 做什麼 | 會跑 Unity MCP？ |
+| 指令 | 做什麼 | 會跑 Unity MCP？ |
 |------|--------|------------------|
-| `--goals-to-task-list` | `build_goals` → Plan Normalize → 更新 `task_list` | 否 |
-| `--replan-and-run` | 同上，然後執行 pending 任務 | 是 |
-| （無旗標，已有 `task_list`） | 只執行隊列，**不**自動重讀藍圖 | 是 |
+| `unity-mcp-harness --goals build` | 藍圖 → `task_list` | 否 |
+| `unity-mcp-harness` | 執行 pending 任務（藍圖與隊列 id 不一致時會自動重算隊列） | 是 |
 
-**順序阻擋**：若依 priority 排序的前置任務為 `failed`，後續 `pending` / `in_progress` **不會執行**，直到 `--retry-failed` 重試該 failed 項。`--continue-on-error` 僅影響**同一輪**內是否繼續（仍會略過 failed 跑後續）。
+**順序阻擋**：若依 priority 排序的前置任務為 `failed`，後續 `pending` / `in_progress` **不會執行**，直到 `--retry-failed` 重試該 failed 項。
 
-## 寫回 `build_goals.yaml`（勿混用）
+## 寫回 `build_goals.yaml`（進階）
 
-| 參數 | 資料來源 | 必須搭配 |
-|------|----------|----------|
-| `--export-goals-from-normalize` | LLM **規範化結果** | 通常 `--replan-and-run` 或首次建隊列 |
-| `--export-goals-from-task-list` | **`task_list` 規劃欄位** | 單獨指令即可（不需 LLM） |
+| 參數 | 資料來源 |
+|------|----------|
+| `--export-goals-from-normalize` | LLM 規範化結果（搭配 `--goals build`） |
+| `--export-goals-from-task-list` / `--sync` | `task_list` 規劃欄位 |
 
-`--backup` 可與任一 export 合用（寫回前產生 `build_goals.yaml.bak`）。
-
-## 執行期日誌
-
-預設 **`unity-mcp-harness` 執行建構時**會即時輸出進度到 stderr（任務開始/結束、LLM 各輪、MCP tool 呼叫、Harness 驗證）：
-
-```powershell
-unity-mcp-harness
-# 含 MCP tool 回傳摘要
-unity-mcp-harness -v
-# 安靜模式（僅錯誤與最終摘要）
-unity-mcp-harness -q
-```
-
-環境變數：`HARNESS_VERBOSE=1`、`HARNESS_QUIET=1`。
+`--backup` 可與 export 合用（`build_goals.yaml.bak`）。
 
 ## 常見流程
 
 ```powershell
-# 工作區
 . .\scripts\_env.ps1
 
-# 1. 改藍圖後，只更新執行隊列
-.\scripts\harness-goals-to-task-list.ps1
+# 1. 改藍圖後更新執行隊列
+unity-mcp-harness --goals build
 
-# 2. 執行（不重規劃）
-.\scripts\harness-run.ps1
-
-# 改藍圖後要「重算隊列 + 立刻開工」
-unity-mcp-harness --replan-and-run
+# 2. 執行建構
+unity-mcp-harness
 ```
 
-## 舊參數對照（仍可用，會印警告）
+## 舊參數（仍可用，會印警告 → 等同 `--goals build`，**不會**再自動執行建構）
 
 | 舊 | 新 |
 |----|-----|
-| `--sync-plan` | `--goals-to-task-list` |
-| `--replan` | `--replan-and-run` |
-| `--write-back-goals`（搭配 sync-plan） | `--goals-to-task-list --export-goals-from-task-list` 或單獨 `--export-goals-from-task-list` |
-| `--write-back-goals`（搭配 replan） | `--replan-and-run --export-goals-from-normalize` |
+| `--goals-to-task-list` / `--sync-plan` / `--replan` / `--init-tasks` / `--replan-and-run` | `--goals build` |
 
 ## 重新安裝（移除舊 pip 執行檔）
 
 在 **已安裝過舊版** 的環境執行：
 
 ```powershell
-# 1. 解除安裝套件（會移除 Scripts 下的 unity-mcp-build.exe 等）
-pip uninstall unity-mcp-harness -y
-
-# 2. 確認已無殘留（應顯示 WARNING: Package(s) not found 或成功）
-pip show unity-mcp-harness
-
-# 3. 可選：刪除仍留在 PATH 的殘檔（若 pip uninstall 後仍存在）
-$scripts = python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
-Get-ChildItem $scripts -Filter "unity-mcp-*" | Select-Object Name, LastWriteTime
-
-# 4. 從原始碼目錄 editable 安裝
-cd C:\Users\PC\Documents\llm-server\unity-mcp-harness
-pip install -e .
-
-# 5. 確認入口（應有 harness，不應再依賴 unity-mcp-build）
-Get-ChildItem $scripts -Filter "unity-mcp-*"
-unity-mcp-harness --help
+pip uninstall -y unity-mcp-build
+pip install -e .\unity-mcp-harness
 ```
-
-若曾用 PyInstaller 打包的 `unity-mcp-build.exe`，請手動刪除 `dist\` 內舊 exe，與 pip 無關。

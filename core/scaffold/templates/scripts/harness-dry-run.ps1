@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 $extra = @("--dry-run")
 if ($Replan) {
-    $extra = @("--replan-and-run", "--dry-run")
+    $extra = @("--goals", "build", "--dry-run")
 }
 
 unity-mcp-harness @extra @args

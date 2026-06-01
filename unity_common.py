@@ -46,11 +46,9 @@ def _is_frozen() -> bool:
 
 def project_root() -> Path:
     """
-    unity-mcp 工作目錄：放 ``build_goals.yaml``、``unity_servers.json`` 的位置。
+    Harness 根目錄：``UNITY_MCP_HOME`` > PyInstaller exe 目錄 > 原始碼目錄。
 
-    優先序：``UNITY_MCP_HOME`` > PyInstaller 執行檔所在目錄 > 原始碼目錄。
-    打包成 exe 時請將上述設定檔與 exe 放在同一資料夾（或設環境變數），
-    **不必**為修改任務而重新編譯。
+    未設 ``UNITY_MCP_HOME`` 且從 catalog 子目錄執行時，藍圖/task_list 請用 ``workspace_root()``。
     """
     env = os.environ.get(ENV_PROJECT_HOME, "").strip()
     if env:
@@ -58,6 +56,38 @@ def project_root() -> Path:
     if _is_frozen():
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
+
+
+HARNESS_WORKSPACE_MARKERS = (
+    "build_goals.yaml",
+    "task_list.yaml",
+    "unity_servers.json",
+)
+
+
+def _is_harness_workspace_directory(root: Path) -> bool:
+    """目錄是否像 catalog / planetary-malignamcy 等 Harness 工作區。"""
+    root = root.resolve()
+    for name in HARNESS_WORKSPACE_MARKERS:
+        if (root / name).is_file():
+            return True
+    return (root / "config" / "local.env.ps1").is_file()
+
+
+def workspace_root() -> Path:
+    """
+    Harness **工作區**根目錄：``build_goals.yaml``、``task_list.yaml`` 等所在位置。
+
+    優先序：``UNITY_MCP_HOME`` > 目前工作目錄（若具工作區標記）> 套件 ``project_root()``。
+    從 ``planetary-malignamcy`` 執行 ``--goals modify`` 時會讀寫該目錄的藍圖，而非套件內範例。
+    """
+    env = os.environ.get(ENV_PROJECT_HOME, "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
+    cwd = Path.cwd().resolve()
+    if _is_harness_workspace_directory(cwd):
+        return cwd
+    return project_root()
 
 
 def resolve_aicentral_config_dir() -> Path:
@@ -69,7 +99,7 @@ def resolve_aicentral_config_dir() -> Path:
     env = os.environ.get(ENV_AICENTRAL_HOME, "").strip()
     if env:
         return Path(env).expanduser().resolve() / "config"
-    return project_root() / "config"
+    return workspace_root() / "config"
 
 
 def resolve_harness_llm_config_paths(
@@ -359,9 +389,12 @@ def resolve_server_specs(
     if env_path:
         return load_server_specs(env_path)
 
-    local = project_root() / LOCAL_SERVERS_FILE
+    local = workspace_root() / LOCAL_SERVERS_FILE
     if local.is_file():
         return load_server_specs(local)
+    pkg = project_root() / LOCAL_SERVERS_FILE
+    if pkg.is_file() and pkg != local:
+        return load_server_specs(pkg)
 
     env_url = os.environ.get(ENV_SINGLE_URL, "").strip()
     if env_url:
